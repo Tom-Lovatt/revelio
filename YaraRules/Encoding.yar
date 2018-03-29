@@ -1,8 +1,5 @@
 import "math"
 
-include "PHPStatements.yar"
-
-
 /**
  * <Compression/Encoding>
  * These rules attempt to identify compressed or encoded data
@@ -61,72 +58,28 @@ rule Hex_Encoding {
     condition:
         $re1
 }
-
-
-rule Command_Passthrough {
+rule High_Operator_Density {
     meta:
         score = 3
 
     strings:
-        $s1 = "$_POST['cmd']"
-        $s2 = "$_GET['cmd']"
+        $re1 = /[-*\/%=.|&^~<>!@`+]/
 
     condition:
-        any of them
+        #re1*1.0 \ filesize > 0.25
 }
-rule System_Files {
-    meta:
-        score = 5
-
-    strings:
-        $s1 = "/etc/passwd"
-        $s2 = "/bin/sh"
-        $s3 = "/bin/bash"
-
-    condition:
-        any of them
-}
-rule File_Manipulation {
-    meta:
-        score = 2
-
-    strings:
-        $s1 = "htpasswd"
-        $s2 = "htaccess"
-
-    condition:
-        3 of them
-}
-
-/**
- * <Code style>
- * Most programmers optimise their code style for readability
- * and maintainability; malware generators do the opposite.
- *
- */
-
-rule Statements_Per_Line {
-    /** Can produce false positive where minified JS is printed by PHP */
+rule High_Concatenation_Density {
+    /**
+     * To avoid using functions directly, obfuscated code
+     * will often call them through concatenated strings
+     * e.g $a = 'aelv'; $a[1].$a[3].$a[0].$a[2]()
+     */
     meta:
         score = 3
 
     strings:
-        $s1 = ";"
-        $s2 = "<script type=\"text/javascript\">"
+        $re1 = /\. *\$/
 
     condition:
-        #s1 \ file_num_lines > 4
-        and not $s2
-}
-rule Whitespace_Hiding_Injection {
-    /* Whitespace following the PHP tag is often used
-     to push injected code out of an editor window */
-    meta:
-        score = 4
-
-    strings:
-        $re1 = /^\<\?php\s{15,}\S/
-
-    condition:
-        $re1
+        #re1*1.0 \ file_num_lines > 0.29
 }

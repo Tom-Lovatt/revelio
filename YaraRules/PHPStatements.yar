@@ -88,7 +88,7 @@ rule OS_Commands {
         $s5 = "pcntl_exec("
         $s6 = "netstat"
 
-        $re1 = /(^|[^A-Za-z_])system\(
+        $re1 = /(^|[^A-Za-z_])system\(/
 
     condition:
         any of them

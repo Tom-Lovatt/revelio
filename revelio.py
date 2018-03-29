@@ -26,7 +26,7 @@ def populate_external_vars(path):
 
 
 rules = yara.compile(filepaths={
-    'php_statements': 'YaraRules/MasterRules.yar'
+    'php_statements': 'YaraRules/Index.yar'
 }, externals=EXTERNAL_VARS_TEMPLATE)
 
 MAX_MATCHES = -1
