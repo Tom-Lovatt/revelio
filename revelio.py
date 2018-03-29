@@ -49,7 +49,7 @@ for path in glob.iglob(target, recursive=True):
 fn, fp, tn, tp = {}, {}, {}, {}
 
 for path, match_data in all_files.items():
-    if match_data['score'] >= 10:
+    if match_data['score'] >= 5:
         if 'Malicious' in path or 'BAD' in path:
             tp[path] = match_data
         else:

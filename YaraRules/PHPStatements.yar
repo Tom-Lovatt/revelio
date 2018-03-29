@@ -14,17 +14,15 @@ rule Eval {
     condition:
         $s1
 }
-rule Reversed {
+rule Eval_Dynamic_Input {
     meta:
-        score = 2
+        score = 4
 
     strings:
-        $s1 = "strrev("
-        $s2 = ";)("
-        $s3 = "noitcnuf"
+        $re1 = /eval\([^);]*(file_get_contents|\$_REQUEST|\$_GET|\$_POST)/
 
     condition:
-        2 of them
+        $re1
 }
 rule Base64 {
     meta:
@@ -81,7 +79,7 @@ rule OS_Commands {
         score = 3
 
     strings:
-        $s1 = "passthru("
+        $s1 = "passthru(" fullword // Avoid fpassthru
         $s2 = "shell_exec("
         $s3 = "popen("
         $s4 = "proc_open("
@@ -169,5 +167,13 @@ rule NoKeywords {
     condition:
         $s1 and not (any of ($ex*))
 }
+rule ExecuteRegex {
+        meta:
+            score = 5
 
+        strings:
+            $re1 = /\("\/[^\/]*\/e",/
 
+        condition:
+            $re1
+}

@@ -12,11 +12,12 @@ rule Statements_Per_Line {
 
     strings:
         $s1 = ";"
-        $s2 = "<script type=\"text/javascript\">"
+
+        $ex1 = "<script type=\"text/javascript\">"
 
     condition:
         #s1 \ file_num_lines > 4
-        and not $s2
+        and not ($ex1)
 }
 rule Whitespace_Hiding_Injection {
     /* Whitespace following the PHP tag is often used
@@ -29,4 +30,16 @@ rule Whitespace_Hiding_Injection {
 
     condition:
         $re1
+}
+rule Large_Files {
+    /*
+     * Malicious scripts often combine all their dependencies
+     * into 1 single file for maximum compatibility. This can
+     * massively increase the file size.
+     */
+     meta:
+        score = 4
+
+     condition:
+        filesize > 400KB
 }

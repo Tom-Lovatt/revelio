@@ -8,45 +8,56 @@ import "math"
  */
 rule File_Entropy {
     meta:
-        score = 5
+        score = 3
 
     strings:
-        $s1 = "data:image/png;base64"
+        $ex1 = "<script type=\"text/javascript\">"
+        $ex2 = /data\:image\/[a-z0-9.\-+]*;base64/
 
     condition:
-        math.entropy(0, filesize) > 5.58 // 5.7
-        and not $s1
+        math.entropy(0, filesize) > 5.58 // 5.58
+        and not (1 of ($ex*))
 }
 rule Long_Strings {
     meta:
-        score = 5
+        score = 4
 
     strings:
-        $s1 = "data:image/png;base64"
+        $ex1 = "<script type=\"text/javascript\">"
+        $ex2 = /data\:image\/[a-z0-9.\-+]*;base64/
 
     condition:
         file_longest_unbroken_string > 950
-        and not $s1
+        and not (1 of ($ex*))
 }
 rule Possible_Compression {
+    /**
+     * We can't search for compression via headers or
+     * compressed versions of common strings because
+     * they could be further encoded/obfuscated
+     */
     meta:
         score = 2
 
     strings:
         $s1 = "+"
         $s2 = "/"
-        $s3 = "+++"
+        //$s3 = "+++"
 
-        $s4 = "data:image/png;base64"
+        $ex1 = "<script type=\"text/javascript\">"
+        $ex2 = /data\:image\/[a-z0-9.\-+]*;base64/
 
     condition:
         (
-            (#s1 > 10 and #s2 > 10) and
-            (#s1 + #s2)*1.0 \ filesize > 0.035 and
-            (#s1 + #s2) \ file_num_lines > 2 or
-            $s3
-        ) and not
-        $s4
+            // Compressed data has a large quantity of + and / symbols
+            // in roughly the same proportion
+            (#s1 > 10 and #s2 > 10) and (#s1*1.0 \ #s2 > 0.9) and (
+                (#s1 + #s2)*1.0 \ filesize > 0.35 or
+                (#s1 + #s2)*1.0 \ file_num_lines > 2
+            )// or
+            //$s3
+        )
+        and not (1 of ($ex*))
 }
 rule Hex_Encoding {
     meta:
@@ -65,8 +76,11 @@ rule High_Operator_Density {
     strings:
         $re1 = /[-*\/%=.|&^~<>!@`+]/
 
+        $ex1 = "<script type=\"text/javascript\">"
+
     condition:
         #re1*1.0 \ filesize > 0.25
+        and not $ex1
 }
 rule High_Concatenation_Density {
     /**
@@ -80,6 +94,38 @@ rule High_Concatenation_Density {
     strings:
         $re1 = /\. *\$/
 
+        $ex1 = "<script type=\"text/javascript\">"
+
     condition:
         #re1*1.0 \ file_num_lines > 0.29
+        and not $ex1
+}
+rule High_Variable_Density {
+    /**
+     * As above, but searching for other uses of the variable.
+     * Can be thrown off by minified embedded jQuery
+     */
+     meta:
+        score = 4
+
+     strings:
+        $re1 = /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/
+
+        $ex1 = "<script type=\"text/javascript\">"
+
+     condition:
+        #re1*1.0 \ file_num_lines > 2.1
+        and not $ex1
+}
+rule Reversed {
+    meta:
+        score = 5
+
+    strings:
+        $s1 = "(tessi(fi"
+        $s2 = ";)("
+        $s3 = "noitcnuf"
+
+    condition:
+        2 of them
 }
