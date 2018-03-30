@@ -4,22 +4,23 @@
  * to obfuscation and executing commands.
  *
  */
-rule Eval {
+rule Evaluate {
     meta:
         score = 2
 
     strings:
         $s1 = "eval("
+        $s2 = "assert("
 
     condition:
-        $s1
+        any of them
 }
-rule Eval_Dynamic_Input {
+rule Evaluate_Dynamic_Input {
     meta:
         score = 4
 
     strings:
-        $re1 = /eval\([^);]*(file_get_contents|\$_REQUEST|\$_GET|\$_POST)/
+        $re1 = /(eval|assert)\([^);]*(file_get_contents|\$_REQUEST|\$_GET|\$_POST|getenv)/
 
     condition:
         $re1
@@ -93,12 +94,12 @@ rule OS_Commands {
 }
 rule NoKeywords {
     /**
-     * Some scripts obfuscate everything, including normal PHP
-     * If none of PHP's keywords appear at all, it's likely obfuscated
-     * TODO: explain/justify removing 'as', 'do' and 'echo'. The first
-     *       2 are short enough to cause false positives within random data
-     *       echo is one of the few statements actually used in obfuscated scripts,
-     *       maybe because it's a built-in rather than a function?
+     * Some scripts obfuscate everything, including normal PHP.
+     * If none of PHP's keywords appear at all, it's likely obfuscated.
+     * 'as', 'do', and 'echo' don't appear below. The first two are
+     * short enough to cause false positives within random data, and
+     * require the while keyword anyway. The echo keyword appears
+     * in even heavily obfuscated scripts, since it's the simplest output
      */
     meta:
         score = 4
@@ -121,7 +122,7 @@ rule NoKeywords {
         $ex15 = "empty("
         $ex16 = "enddeclare"
         $ex17 = "endfor"
-        $ex18 = "endforeach"
+        $ex18 = "foreach"
         $ex19 = "endif"
         $ex20 = "endswitch"
         $ex21 = "endwhile"
@@ -161,6 +162,10 @@ rule NoKeywords {
         $ex55 = "__METHOD__"
         $ex56 = "__NAMESPACE__"
         $ex57 = "__TRAIT__"
+
+        $ex58 = /if\s*\(/
+        $ex59 = /do\s*\{/
+        $ex60 = /for\s*\{/
 
         $s1 = ";"
 

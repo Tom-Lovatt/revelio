@@ -23,12 +23,11 @@ rule Long_Strings {
         score = 4
 
     strings:
-        $ex1 = "<script type=\"text/javascript\">"
-        $ex2 = /data\:image\/[a-z0-9.\-+]*;base64/
+        $ex1 = /data\:image\/[a-z0-9.\-+]*;base64/
 
     condition:
         file_longest_unbroken_string > 950
-        and not (1 of ($ex*))
+        and $ex1
 }
 rule Possible_Compression {
     /**
@@ -42,10 +41,9 @@ rule Possible_Compression {
     strings:
         $s1 = "+"
         $s2 = "/"
-        //$s3 = "+++"
+        $s3 = "+++"
 
-        $ex1 = "<script type=\"text/javascript\">"
-        $ex2 = /data\:image\/[a-z0-9.\-+]*;base64/
+        $ex1 = /data\:image\/[a-z0-9.\-+]*;base64/
 
     condition:
         (
@@ -54,17 +52,17 @@ rule Possible_Compression {
             (#s1 > 10 and #s2 > 10) and (#s1*1.0 \ #s2 > 0.9) and (
                 (#s1 + #s2)*1.0 \ filesize > 0.35 or
                 (#s1 + #s2)*1.0 \ file_num_lines > 2
-            )// or
-            //$s3
+            ) or
+            $s3
         )
-        and not (1 of ($ex*))
+        and not $ex1
 }
 rule Hex_Encoding {
     meta:
         score = 3
 
     strings:
-        $re1 = /(\\x(6[1-9A-F]|7[0-9A])){3,}/ nocase
+        $re1 = /((\\x)*(6[1-9A-F]|7[0-9A])){5,}/ nocase
 
     condition:
         $re1
@@ -76,11 +74,8 @@ rule High_Operator_Density {
     strings:
         $re1 = /[-*\/%=.|&^~<>!@`+]/
 
-        $ex1 = "<script type=\"text/javascript\">"
-
     condition:
         #re1*1.0 \ filesize > 0.25
-        and not $ex1
 }
 rule High_Concatenation_Density {
     /**
@@ -92,13 +87,10 @@ rule High_Concatenation_Density {
         score = 3
 
     strings:
-        $re1 = /\.\s*\n/
-
-        $ex1 = "<script type=\"text/javascript\">"
+        $re1 = /\.\s*\$/
 
     condition:
         #re1*1.0 \ file_num_lines > 0.29
-        and not $ex1
 }
 rule High_Variable_Density {
     /**
@@ -111,11 +103,8 @@ rule High_Variable_Density {
      strings:
         $re1 = /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/
 
-        $ex1 = "<script type=\"text/javascript\">"
-
      condition:
         #re1*1.0 \ file_num_lines > 2.1
-        and not $ex1
 }
 rule Reversed {
     meta:
@@ -128,4 +117,34 @@ rule Reversed {
 
     condition:
         2 of them
+}
+rule High_Multiline_Concatenation {
+    /**
+     * Encoded strings are often split across many lines
+     * to avoid detection. If a file is mostly made up of
+     * concatenated strings, it's likely encoded.
+     */
+    meta:
+        score = 4
+
+    strings:
+        $re1 = /\.[ \t]*\n/
+
+    condition:
+        #re1*1.0 \ file_num_lines > 0.8
+}
+rule Bad_MIME_Type {
+    /**
+     * Some scripts pretend to be image files, either
+     * to bypass upload file restrictions or to avoid
+     * detection once they've been uploaded.
+     */
+    meta:
+        score = 5
+
+    strings:
+        $re1 = "/^GIF89a1/"
+
+    condition:
+        $re1
 }
