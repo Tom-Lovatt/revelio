@@ -92,7 +92,7 @@ rule High_Concatenation_Density {
         score = 3
 
     strings:
-        $re1 = /\. *\$/
+        $re1 = /\.\s*\n/
 
         $ex1 = "<script type=\"text/javascript\">"
 
