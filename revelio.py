@@ -6,14 +6,22 @@ import yara
 from pprint import pprint
 from util.file_preprocessing import preprocess
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 EXTERNAL_VARS_TEMPLATE = {
     'file_num_lines': 0,
     'file_longest_unbroken_string': 0
 }
 all_files = {}
+DEV_CONFIG = {
+    'PRINT_MATCHED_STRINGS': 0,
+    'PRINT_FN': 1,
+    'PRINT_FP': 1,
+    'PRINT_TN': 0,
+    'PRINT_TP': 0
+}
 
 rules = yara.compile(filepaths={
-    'php_statements': 'YaraRules/Index.yar'
+    'php_statements': os.path.join(SCRIPT_DIR, 'YaraRules/Index.yar')
 }, externals=EXTERNAL_VARS_TEMPLATE)
 
 
@@ -35,7 +43,8 @@ def parse_match(file_path, match):
     all_files[file_path]['patterns'].append(match.rule)
     if 'score' in match.meta:
         all_files[file_path]['score'] += match.meta['score']
-    # all_files[file_path]['strings'].append(match.strings)
+    if DEV_CONFIG['PRINT_MATCHED_STRINGS']:
+        all_files[file_path]['strings'].append(match.strings)
 
 
 def populate_external_vars(file_path):
@@ -65,21 +74,23 @@ def print_results():
             else:
                 tn[path] = match_data
 
-    # print("True positives:")
-    # pprint(tp)
-    if len(fn):
+    if len(tp) and DEV_CONFIG['PRINT_TP']:
+        print("True positives:")
+        pprint(tp)
+    if len(fn) and DEV_CONFIG['PRINT_FN']:
         print("False negatives:")
         pprint(fn)
-    if len(fp):
+    if len(fp) and DEV_CONFIG['PRINT_FP']:
         print("False positives:")
         pprint(fp)
-    # print("True negatives: ")
-    # pprint(tn)
+    if len(tn) and DEV_CONFIG['PRINT_TN']:
+        print("True negatives: ")
+        pprint(tn)
 
     rate_tp = (float(len(tp)) / (len(tp) + len(fn))) * 100 if len(tp) > 0 else 0
     rate_fp = (float(len(fp)) / (len(fp) + len(tn))) * 100 if len(tn) > 0 else 0
 
-    print("True positive rate: ({} tagged out of {}) {}%".format(len(tp), len(tp)+len(fn),round(rate_tp, 3)))
+    print("True positive rate: ({} tagged out of {}) {}%".format(len(tp), len(tp)+len(fn), round(rate_tp, 3)))
     print("False positive rate: ({} tagged out of {}) {}%".format(len(fp), len(fp) + len(tn), round(rate_fp, 3)))
 
 
