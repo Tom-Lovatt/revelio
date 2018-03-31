@@ -10,30 +10,22 @@ rule File_Entropy {
     meta:
         score = 3
 
-    strings:
-        $ex1 = "<script type=\"text/javascript\">"
-        $ex2 = /data\:image\/[a-z0-9.\-+]*;base64/
-
     condition:
         math.entropy(0, filesize) > 5.58 // 5.58
-        and not (1 of ($ex*))
 }
 rule Long_Strings {
     meta:
         score = 4
 
-    strings:
-        $ex1 = /data\:image\/[a-z0-9.\-+]*;base64/
-
     condition:
         file_longest_unbroken_string > 950
-        and $ex1
 }
 rule Possible_Compression {
     /**
-     * We can't search for compression via headers or
-     * compressed versions of common strings because
-     * they could be further encoded/obfuscated
+     * Searching for compression via headers or
+     * compressed versions of common strings is difficult
+     * because they could be further encoded/obfuscated.
+     * Looking at the format is often more effective.
      */
     meta:
         score = 2
@@ -43,19 +35,17 @@ rule Possible_Compression {
         $s2 = "/"
         $s3 = "+++"
 
-        $ex1 = /data\:image\/[a-z0-9.\-+]*;base64/
+        // Large chunks of AAAA represents base64 encoded null bytes
+        $re1 = /A{10,}/
 
     condition:
-        (
-            // Compressed data has a large quantity of + and / symbols
-            // in roughly the same proportion
-            (#s1 > 10 and #s2 > 10) and (#s1*1.0 \ #s2 > 0.9) and (
-                (#s1 + #s2)*1.0 \ filesize > 0.35 or
-                (#s1 + #s2)*1.0 \ file_num_lines > 2
-            ) or
-            $s3
-        )
-        and not $ex1
+        // Compressed data in base64 has a large quantity of + and / symbols
+        // in roughly the same proportion
+        (#s1 > 10 and #s2 > 10) and (#s1*1.0 \ #s2 > 0.9) and (
+            (#s1 + #s2)*1.0 \ filesize > 0.35 or
+            (#s1 + #s2)*1.0 \ file_num_lines > 2
+        ) or
+        1 of ($s3, $re1)
 }
 rule Hex_Encoding {
     meta:
@@ -67,6 +57,13 @@ rule Hex_Encoding {
     condition:
         $re1
 }
+rule Encoded_Short_File {
+    meta:
+        score = 3
+
+    condition:
+        file_num_lines < 50 and Hex_Encoding
+}
 rule High_Operator_Density {
     meta:
         score = 3
@@ -76,6 +73,23 @@ rule High_Operator_Density {
 
     condition:
         #re1*1.0 \ filesize > 0.25
+}
+rule High_Bitwise_Density {
+    /**
+     * As above, but bitwise operators are rarer
+     * outside obfuscation, so we can judge a bit
+     * more harshly. Can be thrown off by regex or
+     * html entities.
+     */
+    meta:
+        score = 4
+
+    strings:
+        $re1 = /[^&|][&|~^][^&|#]/ // Don't allow &&, || or html entities
+
+    condition:
+        #re1*1.0 \ file_num_lines > 0.9
+        and file_num_lines < 100
 }
 rule High_Concatenation_Density {
     /**
@@ -88,9 +102,11 @@ rule High_Concatenation_Density {
 
     strings:
         $re1 = /\.\s*\$/
+        $re2 = /\([^)]*\)\s*\.\s*/
 
     condition:
-        #re1*1.0 \ file_num_lines > 0.29
+        (#re1+#re2)*1.0 \ file_num_lines > 0.29
+        and (#re1+#re2) >= 3
 }
 rule High_Variable_Density {
     /**
@@ -106,7 +122,26 @@ rule High_Variable_Density {
      condition:
         #re1*1.0 \ file_num_lines > 2.1
 }
+rule Variable_Functions_Per_Line {
+    /**
+     * Calling variables as functions (e.g $a = 'eval' $a(..))
+     * can help obfuscate a script, but most legitimate code
+     * uses this sparingly.
+     */
+    meta:
+        score = 5
+
+    strings:
+        $re1 = /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\(/
+
+    condition:
+        #re1*1.0 \ file_num_lines > 0.2
+}
 rule Reversed {
+    /**
+     * Searches for the reversed content, not the process of
+     * reversing. See PHPStatements.yar for strrev()
+     */
     meta:
         score = 5
 
@@ -143,7 +178,7 @@ rule Bad_MIME_Type {
         score = 5
 
     strings:
-        $re1 = "/^GIF89a1/"
+        $re1 = /^GIF89a1/
 
     condition:
         $re1

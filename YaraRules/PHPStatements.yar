@@ -6,11 +6,13 @@
  */
 rule Evaluate {
     meta:
-        score = 2
+        score = 1
 
     strings:
         $s1 = "eval("
         $s2 = "assert("
+
+        $re1 = /['"](eval|assert)['"]/
 
     condition:
         any of them
@@ -24,6 +26,40 @@ rule Evaluate_Dynamic_Input {
 
     condition:
         $re1
+}
+rule Evaluate_Encoded {
+    meta:
+        score = 5
+
+    strings:
+        $re1 = /(eval|assert)\([^)]*(base64_decode|str_rot13|convert_uudecode|gz|bz)/
+
+    condition:
+        $re1
+}
+rule Include_Dynamic_Input {
+    meta:
+        score = 5
+
+    strings:
+        $s1 = "allow_url_include"
+
+        $re1 = /include\(['"]php\:\/\/input['"]\)/
+        $re2 = /include\([^)]*(\$_REQUEST|\$_GET|\$_POST|getenv)/
+
+    condition:
+        any of them
+}
+rule String_Reverse {
+    meta:
+        score = 1
+
+    strings:
+        $s1 = "strrev("
+
+    condition:
+        $s1
+
 }
 rule Base64 {
     meta:
@@ -45,7 +81,7 @@ rule Rot13 {
     condition:
         $s1
 }
-rule UUencode {
+rule UUencoded {
     meta:
         score = 4
 
@@ -55,15 +91,16 @@ rule UUencode {
     condition:
         $s1
 }
-rule Gzinflate {
+rule Gzip_Decompression {
     meta:
         score = 1
 
     strings:
         $s1 = "gzinflate("
+        $s2 = "gzuncompress("
 
     condition:
-        $s1
+        any of them
 }
 rule Bzip_Decompression {
     meta:
@@ -80,19 +117,19 @@ rule OS_Commands {
         score = 3
 
     strings:
-        $s1 = "passthru(" fullword // Avoid fpassthru
-        $s2 = "shell_exec("
-        $s3 = "popen("
-        $s4 = "proc_open("
-        $s5 = "pcntl_exec("
-        $s6 = "netstat"
+        $s1 = "shell_exec("
+        $s2 = "proc_open("
+        $s3 = "pcntl_exec("
+        $s4 = "netstat"
 
         $re1 = /(^|[^A-Za-z_])system\(/
+        $re2 = /(^|[^A-Za-z_])passthru\(/
+        $re3 = /popen\(.*?,\s['"]r['"]\s*?\)/
 
     condition:
         any of them
 }
-rule NoKeywords {
+rule No_Keywords {
     /**
      * Some scripts obfuscate everything, including normal PHP.
      * If none of PHP's keywords appear at all, it's likely obfuscated.
@@ -105,63 +142,54 @@ rule NoKeywords {
         score = 4
 
     strings:
-        $ex1 = "__halt_compiler("
-        $ex2 = "abstract"
-        $ex3 = "and"
-        $ex4 = "array("
-        $ex5 = "break"
-        $ex6 = "callable"
-        $ex7 = "clone"
-        $ex8 = "const"
-        $ex9 = "continue"
-        $ex10 = "declare"
-        $ex11 = "default"
-        $ex12 = "die("
-        $ex13 = "else"
-        $ex14 = "elseif"
-        $ex15 = "empty("
-        $ex16 = "enddeclare"
-        $ex17 = "endfor"
-        $ex18 = "foreach"
-        $ex19 = "endif"
-        $ex20 = "endswitch"
-        $ex21 = "endwhile"
-        $ex22 = "eval("
-        $ex23 = "exit("
-        $ex24 = "extends"
-        $ex25 = "final"
-        $ex26 = "finally"
-        $ex27 = "global"
-        $ex28 = "goto"
-        $ex29 = "include_once"
-        $ex30 = "instanceof"
-        $ex31 = "insteadof"
-        $ex32 = "list("
-        $ex33 = "namespace"
-        $ex34 = "private"
-        $ex35 = "protected"
-        $ex36 = "public"
-        $ex37 = "require"
-        $ex38 = "require_once"
-        $ex39 = "return"
-        $ex40 = "static"
-        $ex41 = "switch"
-        $ex42 = "throw"
-        $ex43 = "trait"
-        $ex44 = "try"
-        $ex45 = "unset("
-        $ex46 = "use"
-        $ex47 = "var"
-        $ex48 = "while"
-        $ex49 = "xor"
-        $ex50 = "__CLASS__"
-        $ex51 = "__DIR__"
-        $ex52 = "__FILE__"
-        $ex53 = "__FUNCTION__"
-        $ex54 = "__LINE__"
-        $ex55 = "__METHOD__"
-        $ex56 = "__NAMESPACE__"
-        $ex57 = "__TRAIT__"
+		$ex1 = "abstract"
+		$ex2 = "and"
+		$ex3 = "break"
+		$ex4 = "callable"
+		$ex5 = "clone"
+		$ex6 = "const"
+		$ex7 = "continue"
+		$ex8 = "declare"
+		$ex9 = "default"
+		$ex10 = "else"
+		$ex11 = "elseif"
+		$ex12 = "enddeclare"
+		$ex13 = "endfor"
+		$ex14 = "foreach"
+		$ex15 = "endif"
+		$ex16 = "endswitch"
+		$ex17 = "endwhile"
+		$ex18 = "extends"
+		$ex19 = "final"
+		$ex20 = "finally"
+		$ex21 = "global"
+		$ex22 = "goto"
+		$ex23 = "include"
+		$ex24 = "instanceof"
+		$ex25 = "insteadof"
+		$ex26 = "namespace"
+		$ex27 = "private"
+		$ex28 = "protected"
+		$ex29 = "public"
+		$ex30 = "require"
+		$ex31 = "require_once"
+		$ex32 = "return"
+		$ex33 = "static"
+		$ex34 = "switch"
+		$ex35 = "throw"
+		$ex36 = "trait"
+		$ex37 = "try"
+		$ex38 = "use"
+		$ex39 = "var"
+		$ex40 = "while"
+		$ex41 = "xor"
+		$ex42 = "__CLASS__"
+		$ex43 = "__DIR__"
+		$ex44 = "__FILE__"
+		$ex45 = "__FUNCTION__"
+		$ex46 = "__LINE__"
+		$ex47 = "__METHOD__"
+		$ex48 = "__NAMESPACE__"
 
         $ex58 = /if\s*\(/
         $ex59 = /do\s*\{/
@@ -177,8 +205,63 @@ rule ExecuteRegex {
             score = 5
 
         strings:
-            $re1 = /\("\/[^\/]*\/e",/
+            $re1 = /\(["']\/[^\/]*\/e["'],/
 
         condition:
             $re1
+}
+rule Server_Info {
+        meta:
+            score = 3
+
+        strings:
+            $s1 = "phpinfo();"
+
+            $ex1 = "ob_start()"
+
+            $re1 = /\$_SERVER\[["']SERVER_SIGNATURE["']\]/
+            $re2 = /\$_SERVER\[["']SERVER_ADMIN["']\]/
+
+
+        condition:
+            1 of ($re1, $re2)
+            or ($s1 and not $ex1)
+}
+rule Risky_Statements_Per_Line {
+        /**
+         * When legitimate code uses risky statements as
+         * detected above, it usually has a large amount
+         * of other functionality, making for larger files.
+         */
+        meta:
+            score = 5
+
+        condition:
+            file_num_lines < 50 and (
+                Evaluate or                 // yara-python doesn't seem to support
+                Evaluate_Dynamic_Input or   // 'any of (..)' syntax for Rule references
+                Evaluate_Encoded or
+                String_Reverse or
+                Rot13 or
+                UUencoded or
+                OS_Commands or
+                ExecuteRegex or
+                Server_Info
+            )
+}
+rule Extract_User_Input {
+        /**
+         * Extract imports variables from an array, overwriting
+         * existing ones if necessary, making it very dangerous
+         * to use on user input.
+         */
+        meta:
+            score = 5
+
+        strings:
+            $re1 = /extract\(\$HTTP_(GET|SERVER|POST)_VARS/
+            $re2 = /extract\(\$_(GET|POST|REQUEST)/
+
+        condition:
+            any of them
 }

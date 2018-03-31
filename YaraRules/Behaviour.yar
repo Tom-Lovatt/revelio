@@ -13,7 +13,7 @@ rule Command_Passthrough {
         $s1 = "$_POST['cmd']"
         $s2 = "$_GET['cmd']"
 
-        $re1 = /(shell_exec|passthru|system)\(\$_(REQUEST|GET|POST)/ nocase
+        $re1 = /(^|[^A-Za-z_])(shell_exec|passthru|system)\((\$_(REQUEST|GET|POST)|getenv)\(/ nocase
         $re2 = /print\s*(shell_exec|passthru)\(/ nocase
 
     condition:
@@ -31,6 +31,7 @@ rule System_Files {
         $s5 = "/bin/bash"
         $s6 = "/dev/shm"
         $s7 = "/usr/local/apache/conf/httpd.conf"
+        $s8 = "ls -la"
 
         /*
          * Matches the directories (but not files within)
@@ -52,27 +53,27 @@ rule File_Manipulation {
         score = 3
 
     strings:
-        $s1 = "htpasswd"
-        $s2 = "htaccess"
-        $s3 = "getcwd()"
-        $s4 = "lstat("
-        $s5 = "umask("
-        $s6 = "chdir("
-        $s7 = "symlink("
-        $s8 = "chmod("
-        $s9 = "readdir("
-        $s10 = "is_link("
-        $s11 = "filectime("
-        $s12 = "fileatime("
-        $s13 = "posix_getgrgid("
-        $s14 = "octdec("
-        $s15 = "fileperms("
-        $s16 = "opendir("
-        $s17 = "closedir("
-        $s18 = "fopen("
-        $s19 = "fwrite"
-        $s20 = "fclose("
-        $s21 = "mkdir"
+		$s1 = "htpasswd"
+		$s2 = "htaccess"
+		$s3 = "getcwd()"
+		$s4 = "lstat("
+		$s5 = "umask("
+		$s6 = "symlink("
+		$s7 = "chmod("
+		$s8 = "octdec("
+		$s9 = "fileperms("
+		$s10 = "fopen("
+		$s11 = "fwrite"
+		$s12 = "is_link("
+		$s13 = "filectime("
+		$s14 = "fileatime("
+		$s15 = "posix_getgrgid("
+		$s16 = "posix_getegid("
+		$s17 = "chdir("
+		$s18 = "mkdir("
+		$s19 = "opendir("
+		$s20 = "readdir("
+		$s21 = "dirname("
 
         $re1 = /chdir\(['"]../
         $re2 = /fopen\(['"]\/tmp/
@@ -80,6 +81,32 @@ rule File_Manipulation {
     condition:
         8 of ($s*)
         or 1 of ($re*)
+}
+rule Directory_Lister {
+    /**
+     * Similar to above but less functionality. Prints a
+     * directory tree on page load, hence the frequent lack of
+     * a function or class definition
+     */
+
+     meta:
+        score = 5
+
+     strings:
+        $s1 = "opendir("
+        $s2 = "readdir("
+        $s3 = "closedir("
+
+        $ex1 = "function "
+        $ex2 = "class "
+
+        $re1 = /echo[^;]*getcwd\(/
+        $re2 = /exec\(['"]pwd/
+        $re3 = /echo[^;]*SCRIPT_FILENAME/
+
+     condition:
+        (any of ($s*) and (#ex1 + #ex2 < 2))
+        or any of ($re*)
 }
 rule Self_Deletion {
     meta:
@@ -99,7 +126,7 @@ rule Mailers {
         $s1 = /\$smtp[-_]*password/ nocase
         $s2 = /\$smtp[-_]*server/ nocase
         $s3 = /\$e*mail[-_]*list/ nocase
-        $s4 = /(\n|\s+)@*mail\([^)]*\);\(/
+        $s4 = /(\n|\s+)@*mail\([^)]*\);/
         $s5 = "MIME-Version: 1.0" nocase
         $s6 = "From:" nocase
         $s7 = "Return-Path:" nocase
@@ -121,7 +148,7 @@ rule NetworkListener {
     condition:
         any of them
 }
-rule MD5Password {
+rule Password_Lock {
     /**
      * Some webshells have rudimentary login functionality.
      * Since they're standalone, they tend not to use sessions
@@ -134,12 +161,30 @@ rule MD5Password {
         $s1 = "md5($_REQUEST["
         $s2 = "md5($_GET["
         $s3 = "md5($_POST["
-        $s4 = "md5($pass"
-        $s5 = "header(\"WWW-Authenticate" nocase
+        $s4 = "md5($pass" nocase
+
+        $re1 = /header\(["']WWW-Authenticate/ nocase
+        $re2 = /\$_REQUEST\[['"]pass/
 
     condition:
         any of them
 
+}
+rule Session_Management {
+    /**
+     * As above, but smart enough to use sessions.
+     * Not scored as highly since sessions are used
+     * far more legitimately.
+     */
+    meta:
+        score = 2
+
+    strings:
+        $s1 = "session_start("
+        $s2 = "session_destroy("
+
+    condition:
+        any of them
 }
 rule Uploader {
     meta:
@@ -147,18 +192,18 @@ rule Uploader {
 
     strings:
         $s1 = "move_uploaded_file("
-        $s2 = "file_put_contents("
-        $s3 = "fopen($_"
-        $s4 = "is_uploaded_file("
-        $s5 = "$HTTP_POST_FILES"
+        $s2 = "is_uploaded_file("
+        $s3 = "$HTTP_POST_FILES"
+        $s4 = "file_put_contents("
 
         $re1 = /copy\(\$_FILES\[.*?\]\[['"]tmp_name['"]\]/
+        $re2 = /(fopen|fwrite|fputs)\([^)]*\$_(POST|GET|REQUEST)/
 
-        $re2 = /<\s*form/ nocase
-        $re3 = /<input[^>]*type=\\?["'](text|file)/ nocase
+        $re3 = /<\s*form/ nocase
+        $re4 = /<input[^>]*type=\\?["']?(file|text)/ nocase
 
     condition:
-        1 of ($s1, $s2, $s3, $s4, $s5, $re1) and all of ($re2, $re3)
+        1 of ($s*, $re1, $re2) and all of ($re3, $re4)
 }
 rule Permissive_Directories {
     meta:
@@ -194,11 +239,12 @@ rule Database_Interaction {
         $s5 = "mysql_drop_db("
         $s6 = "mysql_list_tables("
         $s7 = "mysql_db_query("
-        $s8 = "DROP DATABASE" nocase
-        $s9 = "SHOW PRIVILEGES" nocase
-        $s10 = "IDENTIFIED BY PASSWORD" nocase
-        $s11 = "DROP USER" nocase
-        $s12 = "mysql:host="
+        $s8 = "SHOW DATABASES" nocase
+        $s9 = "DROP DATABASE" nocase
+        $s10 = "SHOW PRIVILEGES" nocase
+        $s11 = "IDENTIFIED BY PASSWORD" nocase
+        $s12 = "DROP USER" nocase
+        $s13 = "mysql:host="
 
     condition:
         any of them
@@ -215,7 +261,7 @@ rule Privilege_Escalation {
 }
 rule Possible_Spam {
     meta:
-        score = 3
+        score = 5
 
     strings:
         $ua1 = "googlebot" nocase
@@ -281,6 +327,42 @@ rule Local_Curl {
 
     strings:
         $re1 = /curl_setopt\([^)]*file:\/\//
+
+    condition:
+        $re1
+}
+rule Remote_Shell {
+    meta:
+        score = 5
+
+    strings:
+        $s1 = "fsockopen("
+        $s2 = "fwrite("
+        $s3 = "fputs("
+
+        $re1 = /(^|[^A-Za-z_])(shell_exec|system|passthru)\(/
+
+    condition:
+        $s1 and 1 of ($s2, $s3) and $re1
+}
+rule Compressor {
+    meta:
+        score = 4
+
+    strings:
+        $s1 = "\\x50\\x4b" // Matches ZIP signature
+        $s2 = "fwrite("
+
+    condition:
+        $s1 and $s2
+
+}
+rule Self_Modification {
+    meta:
+        score = 4
+
+    strings:
+        $re1 = /fopen\(__FILE__,\s*["'][wa]/
 
     condition:
         $re1

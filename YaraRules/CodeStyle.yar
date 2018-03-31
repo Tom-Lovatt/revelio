@@ -15,6 +15,7 @@ rule Statements_Per_Line {
 
     condition:
         #s1 \ file_num_lines > 4
+        and file_num_lines > 5
 }
 rule Whitespace_Hiding_Injection {
     /* Whitespace following the PHP tag is often used
@@ -48,7 +49,7 @@ rule Create_And_Call_Function {
      * string, not a statement.
      */
     meta:
-        score = 4
+        score = 5
 
     strings:
         $s1 = "call_user_func(create_function("
@@ -76,4 +77,15 @@ rule Hardcoded_IP_Addresses {
 
     condition:
         $re1 and not (1 of ($ex*))
+}
+rule Superglobal_Density {
+    meta:
+        score = 2
+
+    strings:
+        $s1 = "$GLOBALS["
+
+    condition:
+        #s1*1.0 \ file_num_lines > 0.25
+        and #s1 > 10
 }
