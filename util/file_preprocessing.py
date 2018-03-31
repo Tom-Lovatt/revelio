@@ -28,12 +28,18 @@ def strip_script_tags(text):
     return pattern.sub("", text)
 
 
+def strip_image_data(text):
+    pattern = re.compile('data:image/.*?;base64,[^\'"]*')
+    return pattern.sub("", text)
+
+
 def preprocess(file_path):
     temp_path = get_temp_path(file_path)
     content = open(file_path, "r", errors="ignore").read()
 
     content = strip_comments(content)
     content = strip_script_tags(content)
+    content = strip_image_data(content)
 
     f = open(temp_path, "w", errors="ignore")
     f.write(content)
