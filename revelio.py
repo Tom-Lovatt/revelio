@@ -1,53 +1,152 @@
+import shutil
+import argparse
 import glob
+import itertools
+import logging
 import os
 import re
+import signal
+import tempfile
 import sys
+import time
 import yara
-from pprint import pprint
 from util.file_preprocessing import preprocess
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+TMP_DIR = os.path.join(tempfile.gettempdir(), 'revelio')
 EXTERNAL_VARS_TEMPLATE = {
     'file_num_lines': 0,
     'file_longest_unbroken_string': 0
 }
-all_files = {}
-DEV_CONFIG = {
-    'PRINT_MATCHED_STRINGS': 0,
-    'PRINT_FN': 1,
-    'PRINT_FP': 1,
-    'PRINT_TN': 0,
-    'PRINT_TP': 0
-}
+YARA_DETECTION_THRESHOLD = 5
 
-rules = yara.compile(filepaths={
-    'php_statements': os.path.join(SCRIPT_DIR, 'YaraRules/Index.yar')
-}, externals=EXTERNAL_VARS_TEMPLATE)
+log = logging.getLogger(__name__)
 
 
-def enumerate_files(root_dir):
-    for file_path in glob.iglob(root_dir, recursive=True):
-        all_files[file_path] = {'score': 0, 'patterns': [], 'strings': []}
+def main():
+    start_time = time.clock()
 
-        temp_path = preprocess(file_path)
-        external_vars = populate_external_vars(temp_path)
-        matches = rules.match(temp_path, externals=external_vars)
+    signal.signal(signal.SIGINT, exit_handler)
+    config = process_arguments()
+    configure_logger(config)
 
-        for match in matches:
-            parse_match(file_path, match)
+    target_files = enumerate_files(config.targets, config.recurse)
+    results = scan(target_files)
 
-        # os.unlink(temp_path)
+    if len(results) == 0:
+        msg = "No files with a .php extension were found."
+        msg += " Did you mean to supply the --recurse flag?" if not config.recurse else ""
+        log.warning(msg)
 
-
-def parse_match(file_path, match):
-    all_files[file_path]['patterns'].append(match.rule)
-    if 'score' in match.meta:
-        all_files[file_path]['score'] += match.meta['score']
-    if DEV_CONFIG['PRINT_MATCHED_STRINGS']:
-        all_files[file_path]['strings'].append(match.strings)
+    print_results(results, time.clock()-start_time)
 
 
-def populate_external_vars(file_path):
+def exit_handler(signal, frame):
+    log.critical("Caught exit signal, cleaning up and exiting.")
+    if os.path.isdir(TMP_DIR):
+        try:
+            shutil.rmtree(TMP_DIR)
+        except IOError as e:
+            log.error("Couldn't delete {}: {}".format(TMP_DIR, e))
+
+    exit(1)
+
+
+def print_results(results, duration):
+    flagged = 0
+    for path, result in results.items():
+        if result['score'] >= YARA_DETECTION_THRESHOLD:
+            log.info('{} was flagged by {} rules'.format(path, len(result['rules'])))
+            log.debug('{} - {}'.format(path, ','.join(result['rules'])))
+            flagged += 1
+
+    log.info("Scanned {} files in  {}s, {} malicious files identified".format(
+        len(results),
+        round(duration, 2),
+        flagged
+    ))
+
+
+def scan(path_list):
+    results = {}
+    rules = yara.compile(filepath=os.path.join(SCRIPT_DIR, 'YaraRules/Index.yar'), externals=EXTERNAL_VARS_TEMPLATE)
+
+    for path in path_list:
+        log.debug("Scanning " + path)
+        if not validate_file(path):
+            continue
+        temp_path = preprocess(path, TMP_DIR)
+        file_stats = gather_file_statistics(temp_path)
+        matches = rules.match(temp_path, externals=file_stats)
+        results[path] = process_matches(matches)
+        os.unlink(temp_path)
+
+    return results
+
+
+def validate_file(path):
+    return (
+        '.php' in path.lower() and
+        os.path.isfile(path)
+    )
+
+
+def process_matches(matches):
+    result = {'rules': [], 'score': 0, 'strings': []}
+    for match in matches:
+        result['rules'].append(match.rule)
+        result['strings'].append(match.strings)
+        if 'score' in match.meta:
+            result['score'] += match.meta['score']
+
+    return result
+
+
+def process_arguments():
+    parser = argparse.ArgumentParser(description='Scan for malicious PHP files, particularly those using obfuscation.')
+    parser.add_argument('-f', '--log-file', action='store', default=None)
+    parser.add_argument('-r', '--recurse', action='store_true', default=False)
+    parser.add_argument('-q', '--quiet', action='store_true', default=False, help="Don't output to console")
+    parser.add_argument('-v', '--verbose', action='store_true', default=False)
+    parser.add_argument(metavar="target directory", action="store", dest="targets", nargs='*')
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        exit(1)
+
+    return parser.parse_args()
+
+
+def configure_logger(config):
+    verbosity = logging.DEBUG if config.verbose else logging.INFO
+    fmt = '[%(asctime)s] [%(levelname)s] - %(message)s'
+    datefmt = '%Y-%m-%d %H:%M:%S'
+    handlers = []
+
+    if not config.quiet:
+        handlers.append(logging.StreamHandler())
+
+    if config.log_file:
+        handlers.append(logging.FileHandler(config.log_file))
+
+    logging.basicConfig(level=verbosity, format=fmt, datefmt=datefmt, handlers=handlers)
+
+
+def enumerate_files(paths, recursive=False):
+    files = []
+    for path in paths:
+        if os.path.isdir(path):
+            path = os.path.join(path, '**')
+        elif os.path.isfile(path) and '.php' not in path:
+            log.warning(path + " doesn't have a .php extension. Including it in the scan "
+                               "but results may be inconsistent.")
+
+        files = itertools.chain(glob.iglob(path, recursive=recursive), files)
+
+    return files
+
+
+def gather_file_statistics(file_path):
     ext_vars = dict(EXTERNAL_VARS_TEMPLATE)
     # This covers most encoded and compressed strings
     regex = re.compile('[^a-zA-Z0-9/+_]')
@@ -60,51 +159,5 @@ def populate_external_vars(file_path):
     return ext_vars
 
 
-def print_results():
-    fn, fp, tn, tp = {}, {}, {}, {}
-    for path, match_data in all_files.items():
-        if match_data['score'] >= 5:
-            if 'Malicious' in path or 'BAD' in path:
-                tp[path] = match_data
-            else:
-                fp[path] = match_data
-        else:
-            if 'Malicious' in path or 'BAD' in path:
-                fn[path] = match_data
-            else:
-                tn[path] = match_data
-
-    if len(tp) and DEV_CONFIG['PRINT_TP']:
-        print("True positives:")
-        pprint(tp)
-    if len(fn) and DEV_CONFIG['PRINT_FN']:
-        print("False negatives:")
-        pprint(fn)
-    if len(fp) and DEV_CONFIG['PRINT_FP']:
-        print("False positives:")
-        pprint(fp)
-    if len(tn) and DEV_CONFIG['PRINT_TN']:
-        print("True negatives: ")
-        pprint(tn)
-
-    rate_tp = (float(len(tp)) / (len(tp) + len(fn))) * 100 if len(tp) > 0 else 0
-    rate_fp = (float(len(fp)) / (len(fp) + len(tn))) * 100 if len(tn) > 0 else 0
-
-    print("True positive rate: ({} tagged out of {}) {}%".format(len(tp), len(tp)+len(fn), round(rate_tp, 3)))
-    print("False positive rate: ({} tagged out of {}) {}%".format(len(fp), len(fp) + len(tn), round(rate_fp, 3)))
-
-
-for x in range(1, len(sys.argv)):
-    target = sys.argv[x]
-    if os.path.isdir(target):
-        target = os.path.join(target, '**/*.php')
-    elif not os.path.isfile(target):
-        print(target + " + is not a valid file or directory. Skipping.")
-        continue
-    enumerate_files(target)
-
-
-print_results()
-
-
-
+if __name__ == '__main__':
+    main()
