@@ -10,14 +10,6 @@ COMMENT_REGEXES = [
 ]
 
 
-def get_temp_path(path):
-    temp_dir = os.path.join(tempfile.gettempdir(), "revelio")
-    if not os.path.isdir(temp_dir):
-        os.mkdir(temp_dir)
-    temp_path = os.path.join(temp_dir, os.path.basename(path + '.tmp'))
-    return temp_path
-
-
 def strip_comments(text):
     pattern = re.compile('|'.join(COMMENT_REGEXES), re.DOTALL)
     return pattern.sub("", text)
@@ -33,8 +25,11 @@ def strip_image_data(text):
     return pattern.sub("", text)
 
 
-def preprocess(file_path):
-    temp_path = get_temp_path(file_path)
+def preprocess(file_path, tmp_dir):
+    if not os.path.isdir(tmp_dir):
+        os.mkdir(tmp_dir)
+
+    temp_path = os.path.join(tmp_dir, os.path.basename(file_path))
     content = open(file_path, "r", errors="ignore").read()
 
     content = strip_comments(content)
