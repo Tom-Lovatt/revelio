@@ -57,6 +57,16 @@ rule Hex_Encoding {
     condition:
         $re1
 }
+rule Ascii_Numeric_Encoding {
+    meta:
+        score = 3
+
+    strings:
+        $re1 = /(chr\([0-9]{1,3}\)\s*[.,]\s*){5,}/ nocase
+
+    condition:
+        $re1
+}
 rule Encoded_Short_File {
     meta:
         score = 3
