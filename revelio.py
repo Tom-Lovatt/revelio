@@ -19,17 +19,18 @@ EXTERNAL_VARS_TEMPLATE = {
     'file_longest_unbroken_string': 0
 }
 YARA_DETECTION_THRESHOLD = 5
+YARA_RULES_PATH = os.path.join(SCRIPT_DIR, 'YaraRules/Index.yar')
 
 log = logging.getLogger(__name__)
 
 
 def main():
     start_time = time.clock()
-
     signal.signal(signal.SIGINT, exit_handler)
     config = process_arguments()
     configure_logger(config)
 
+    check_yara_rules_files()
     target_files = enumerate_files(config.targets, config.recurse)
     results = scan(target_files)
 
@@ -41,6 +42,17 @@ def main():
     print_results(results, time.clock()-start_time)
 
 
+def check_yara_rules_files():
+    try:
+        yara.compile(filepath=YARA_RULES_PATH, externals=EXTERNAL_VARS_TEMPLATE)
+    except (IOError, yara.Error) as e:
+        log.critical("Failed to read or compile the Yara rules file. Ensure that "
+                     "{} and all files it references are accessible. Error: {}".format(
+                        YARA_RULES_PATH,
+                        e))
+        sys.exit(1)
+
+
 def exit_handler(signal, frame):
     log.critical("Caught exit signal, cleaning up and exiting.")
     if os.path.isdir(TMP_DIR):
@@ -49,7 +61,7 @@ def exit_handler(signal, frame):
         except IOError as e:
             log.error("Couldn't delete {}: {}".format(TMP_DIR, e))
 
-    exit(1)
+    sys.exit(1)
 
 
 def print_results(results, duration):
@@ -60,7 +72,7 @@ def print_results(results, duration):
             log.debug('{} - {}'.format(path, ','.join(result['rules'])))
             flagged += 1
 
-    log.info("Scanned {} files in  {}s, {} malicious files identified".format(
+    log.info("Scanned {} files in  {}s, {} malicious file(s) identified".format(
         len(results),
         round(duration, 2),
         flagged
@@ -69,7 +81,7 @@ def print_results(results, duration):
 
 def scan(path_list):
     results = {}
-    rules = yara.compile(filepath=os.path.join(SCRIPT_DIR, 'YaraRules/Index.yar'), externals=EXTERNAL_VARS_TEMPLATE)
+    rules = yara.compile(filepath=YARA_RULES_PATH, externals=EXTERNAL_VARS_TEMPLATE)
 
     for path in path_list:
         log.debug("Scanning " + path)
@@ -112,7 +124,7 @@ def process_arguments():
 
     if len(sys.argv) == 1:
         parser.print_help()
-        exit(1)
+        sys.exit(1)
 
     return parser.parse_args()
 
