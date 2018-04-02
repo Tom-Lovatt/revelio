@@ -68,11 +68,10 @@ def print_results(results, duration):
     flagged = 0
     for path, result in results.items():
         if result['score'] >= YARA_DETECTION_THRESHOLD:
-            log.info('{} was flagged by {} rules'.format(path, len(result['rules'])))
-            log.debug('{} - {}'.format(path, ','.join(result['rules'])))
+            log.info('{} was flagged by the following rule(s)'.format(path, ','.join(result['rules'])))
             flagged += 1
 
-    log.info("Scanned {} files in  {}s, {} malicious file(s) identified".format(
+    log.info("Scanned {} files in  {}s, {} suspicious file(s) identified".format(
         len(results),
         round(duration, 2),
         flagged
