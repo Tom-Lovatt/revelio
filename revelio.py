@@ -59,7 +59,7 @@ def exit_handler(signal, frame):
         try:
             shutil.rmtree(TMP_DIR)
         except IOError as e:
-            log.error("Couldn't delete {}: {}".format(TMP_DIR, e))
+            log.error("Couldn't clean up temp files, failed to delete {}: {}".format(TMP_DIR, e))
 
     sys.exit(1)
 
@@ -68,7 +68,7 @@ def print_results(results, duration):
     flagged = 0
     for path, result in results.items():
         if result['score'] >= YARA_DETECTION_THRESHOLD:
-            log.info('{} was flagged by the following rule(s)'.format(path, ','.join(result['rules'])))
+            log.info('{} was flagged by the following rule(s): {}'.format(path, ', '.join(result['rules'])))
             flagged += 1
 
     log.info("Scanned {} files in  {}s, {} suspicious file(s) identified".format(
