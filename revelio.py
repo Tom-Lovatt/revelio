@@ -11,6 +11,7 @@ import sys
 import time
 import yara
 from util.file_preprocessing import preprocess
+from util import git_processing as git
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 TMP_DIR = os.path.join(tempfile.gettempdir(), 'revelio')
@@ -31,7 +32,7 @@ def main():
     configure_logger(config)
 
     check_yara_rules_files()
-    target_files = enumerate_files(config.targets, config.recurse)
+    target_files = enumerate_files(config.targets, config.recurse, config.use_git)
     results = scan(target_files)
 
     if len(results) == 0:
@@ -83,9 +84,10 @@ def scan(path_list):
     rules = yara.compile(filepath=YARA_RULES_PATH, externals=EXTERNAL_VARS_TEMPLATE)
 
     for path in path_list:
-        log.debug("Scanning " + path)
         if not validate_file(path):
+            log.debug(path + " doesn't look like a PHP file, skipping.")
             continue
+        log.debug("Scanning " + path)
         temp_path = preprocess(path, TMP_DIR)
         file_stats = gather_file_statistics(temp_path)
         matches = rules.match(temp_path, externals=file_stats)
@@ -117,8 +119,13 @@ def process_arguments():
     parser = argparse.ArgumentParser(description='Scan for malicious PHP files, particularly those using obfuscation.')
     parser.add_argument('-f', '--log-file', action='store', default=None)
     parser.add_argument('-r', '--recurse', action='store_true', default=False)
-    parser.add_argument('-q', '--quiet', action='store_true', default=False, help="Don't output to console")
+    parser.add_argument('-q', '--quiet', action='store_true', default=False,
+                        help="Don't output to console")
     parser.add_argument('-v', '--verbose', action='store_true', default=False)
+    parser.add_argument('-g', '--use-git', action='store_true', default=False,
+                        help="If target is part of a Git repo, use Git metadata in the scan. "
+                             "Note: This mode won't scan any files or directories listed in "
+                             ".gitignore")
     parser.add_argument(metavar="target directory", action="store", dest="targets", nargs='*')
 
     if len(sys.argv) == 1:
@@ -143,9 +150,17 @@ def configure_logger(config):
     logging.basicConfig(level=verbosity, format=fmt, datefmt=datefmt, handlers=handlers)
 
 
-def enumerate_files(paths, recursive=False):
+def enumerate_files(paths, recursive=False, try_git=False):
     files = []
     for path in paths:
+        if git.is_git_dir(path):
+            if try_git:
+                log.debug(path + " looks like a Git repo, listing changed files.")
+                files = itertools.chain(git.enumerate_changed_files(path))
+                continue
+            else:
+                log.info(path + " looks like a Git repo, consider using the --use-git flag.")
+
         if os.path.isdir(path):
             path = os.path.join(path, '**')
         elif os.path.isfile(path) and '.php' not in path:
