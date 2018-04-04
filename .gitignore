@@ -2,3 +2,4 @@ TrainingData/
 .idea
 scratch.py
 __pycache__
+dist/

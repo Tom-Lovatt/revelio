@@ -1,26 +1,25 @@
-import shutil
 import argparse
 import glob
 import itertools
 import logging
 import os
-import re
+import shutil
 import signal
-import tempfile
 import sys
+import tempfile
 import time
-import yara
+
 from util.file_preprocessing import preprocess
-from util import git_processing as git
+from util.processors import GitProcessor as Git
+from util.processors import Processor
+from util.processors import WordpressProcessor as Wordpress
+from util.processors import YaraProcessor as Yara
+from util.result import Result
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 TMP_DIR = os.path.join(tempfile.gettempdir(), 'revelio')
-EXTERNAL_VARS_TEMPLATE = {
-    'file_num_lines': 0,
-    'file_longest_unbroken_string': 0
-}
-YARA_DETECTION_THRESHOLD = 5
-YARA_RULES_PATH = os.path.join(SCRIPT_DIR, 'YaraRules/Index.yar')
+
+SCORE_ALERT_THRESHOLD = 5
 
 log = logging.getLogger(__name__)
 
@@ -31,9 +30,8 @@ def main():
     config = process_arguments()
     configure_logger(config)
 
-    check_yara_rules_files()
-    target_files = enumerate_files(config.targets, config.recurse, config.use_git)
-    results = scan(target_files)
+    target_files = enumerate_files(config.targets, config.recurse)
+    results = scan(target_files, config)
 
     if len(results) == 0:
         msg = "No files with a .php extension were found."
@@ -41,17 +39,6 @@ def main():
         log.warning(msg)
 
     print_results(results, time.clock()-start_time)
-
-
-def check_yara_rules_files():
-    try:
-        yara.compile(filepath=YARA_RULES_PATH, externals=EXTERNAL_VARS_TEMPLATE)
-    except (IOError, yara.Error) as e:
-        log.critical("Failed to read or compile the Yara rules file. Ensure that "
-                     "{} and all files it references are accessible. Error: {}".format(
-                        YARA_RULES_PATH,
-                        e))
-        sys.exit(1)
 
 
 def exit_handler(signal, frame):
@@ -68,30 +55,51 @@ def exit_handler(signal, frame):
 def print_results(results, duration):
     flagged = 0
     for path, result in results.items():
-        if result['score'] >= YARA_DETECTION_THRESHOLD:
-            log.info('{} was flagged by the following rule(s): {}'.format(path, ', '.join(result['rules'])))
+        if result.score >= SCORE_ALERT_THRESHOLD:
+            log.info('{} was flagged with the following notes: {}'.format(path, ', '.join(result.rules)))
+            log.debug('{} file had a score of {}'.format(path, result.score))
             flagged += 1
 
-    log.info("Scanned {} files in  {}s, {} suspicious file(s) identified".format(
+    log.info("Scanned {} files in {}s, {} suspicious file(s) identified".format(
         len(results),
         round(duration, 2),
         flagged
     ))
 
 
-def scan(path_list):
+def scan(path_list, config):
+    wp = Processor()
+    git = Processor()
+    yara = Yara(SCRIPT_DIR)
     results = {}
-    rules = yara.compile(filepath=YARA_RULES_PATH, externals=EXTERNAL_VARS_TEMPLATE)
+
+    if not yara.ready():
+        log.critical("Failed to start Yara.")
+        sys.exit(1)
+
+    if config.wordpress_root:
+        wp = Wordpress(config.wordpress_root)
+
+    if config.git_root:
+        git = Git(config.git_root)
 
     for path in path_list:
+        if os.path.isdir(path):
+            continue
         if not validate_file(path):
             log.debug(path + " doesn't look like a PHP file, skipping.")
             continue
+
+        results[path] = Result()
+
         log.debug("Scanning " + path)
         temp_path = preprocess(path, TMP_DIR)
-        file_stats = gather_file_statistics(temp_path)
-        matches = rules.match(temp_path, externals=file_stats)
-        results[path] = process_matches(matches)
+
+        for processor in yara, wp, git:
+            if processor.ready():
+                log.debug("Running {} plugin".format(processor.get_processor_name()))
+                results[path].merge_with(processor.process(temp_path, path))
+
         os.unlink(temp_path)
 
     return results
@@ -104,17 +112,6 @@ def validate_file(path):
     )
 
 
-def process_matches(matches):
-    result = {'rules': [], 'score': 0, 'strings': []}
-    for match in matches:
-        result['rules'].append(match.rule)
-        result['strings'].append(match.strings)
-        if 'score' in match.meta:
-            result['score'] += match.meta['score']
-
-    return result
-
-
 def process_arguments():
     parser = argparse.ArgumentParser(description='Scan for malicious PHP files, particularly those using obfuscation.')
     parser.add_argument('-f', '--log-file', action='store', default=None)
@@ -122,11 +119,14 @@ def process_arguments():
     parser.add_argument('-q', '--quiet', action='store_true', default=False,
                         help="Don't output to console")
     parser.add_argument('-v', '--verbose', action='store_true', default=False)
-    parser.add_argument('-g', '--use-git', action='store_true', default=False,
-                        help="If target is part of a Git repo, use Git metadata in the scan. "
-                             "Note: This mode won't scan any files or directories listed in "
-                             ".gitignore")
-    parser.add_argument(metavar="target directory", action="store", dest="targets", nargs='*')
+    parser.add_argument('-g', '--git-root', action='store', default=False,
+                        help="If target is part of a Git repo, supply the root directory to "
+                             "use Git metadata in the scan. Note: This mode won't scan any "
+                             "files or directories listed in .gitignore")
+    parser.add_argument('-w', '--wordpress-root', action='store', default=False,
+                        help="If target is part of a Wordpress installation, specify"
+                             "the root directory to include hash verification in the scan")
+    parser.add_argument(metavar="target directory", action="store", dest="targets", nargs='+')
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -153,14 +153,6 @@ def configure_logger(config):
 def enumerate_files(paths, recursive=False, try_git=False):
     files = []
     for path in paths:
-        if git.is_git_dir(path):
-            if try_git:
-                log.debug(path + " looks like a Git repo, listing changed files.")
-                files = itertools.chain(git.enumerate_changed_files(path))
-                continue
-            else:
-                log.info(path + " looks like a Git repo, consider using the --use-git flag.")
-
         if os.path.isdir(path):
             path = os.path.join(path, '**')
         elif os.path.isfile(path) and '.php' not in path:
@@ -170,19 +162,6 @@ def enumerate_files(paths, recursive=False, try_git=False):
         files = itertools.chain(glob.iglob(path, recursive=recursive), files)
 
     return files
-
-
-def gather_file_statistics(file_path):
-    ext_vars = dict(EXTERNAL_VARS_TEMPLATE)
-    # This covers most encoded and compressed strings
-    regex = re.compile('[^a-zA-Z0-9/+_]')
-    with open(file_path, errors='ignore') as f:
-        lus = 0
-        for line in f.readlines():
-            ext_vars['file_num_lines'] += 1
-            lus = max(lus, len(max(regex.split(line), key=len)))
-        ext_vars['file_longest_unbroken_string'] = lus
-    return ext_vars
 
 
 if __name__ == '__main__':
