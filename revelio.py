@@ -116,8 +116,6 @@ def process_arguments():
     parser = argparse.ArgumentParser(description='Scan for malicious PHP files, particularly those using obfuscation.')
     parser.add_argument('-f', '--log-file', action='store', default=None)
     parser.add_argument('-r', '--recurse', action='store_true', default=False)
-    parser.add_argument('-q', '--quiet', action='store_true', default=False,
-                        help="Don't output to console")
     parser.add_argument('-v', '--verbose', action='store_true', default=False)
     parser.add_argument('-g', '--git-root', action='store', default=False,
                         help="If target is part of a Git repo, supply the root directory to "
@@ -141,11 +139,10 @@ def configure_logger(config):
     datefmt = '%Y-%m-%d %H:%M:%S'
     handlers = []
 
-    if not config.quiet:
-        handlers.append(logging.StreamHandler())
-
     if config.log_file:
         handlers.append(logging.FileHandler(config.log_file))
+    else:
+        handlers.append(logging.StreamHandler())
 
     logging.basicConfig(level=verbosity, format=fmt, datefmt=datefmt, handlers=handlers)
 
