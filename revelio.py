@@ -25,11 +25,14 @@ log = logging.getLogger(__name__)
 
 
 def main():
+    global SCORE_ALERT_THRESHOLD
+
     start_time = time.clock()
     signal.signal(signal.SIGINT, exit_handler)
     config = process_arguments()
     configure_logger(config)
 
+    SCORE_ALERT_THRESHOLD -= config.aggressive_scan
     target_files = enumerate_files(config.targets, config.recurse)
     results = scan(target_files, config)
 
@@ -124,6 +127,10 @@ def process_arguments():
     parser.add_argument('-w', '--wordpress-root', action='store', default=False,
                         help="If target is part of a Wordpress installation, specify"
                              "the root directory to include hash verification in the scan")
+    parser.add_argument('-a', '--aggressive-scan', action='count', default=0,
+                        help="Lower the threshold for how suspicious a file needs to "
+                             "be before it's reported. Can be specified up to 3 times, "
+                             "increasing the level each time.")
     parser.add_argument(metavar="target directory", action="store", dest="targets", nargs='+')
 
     if len(sys.argv) == 1:
