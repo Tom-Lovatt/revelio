@@ -154,7 +154,7 @@ def configure_logger(config):
     logging.basicConfig(level=verbosity, format=fmt, datefmt=datefmt, handlers=handlers)
 
 
-def enumerate_files(paths, recursive=False, try_git=False):
+def enumerate_files(paths, recursive=False):
     files = []
     for path in paths:
         if os.path.isdir(path):
