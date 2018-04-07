@@ -171,12 +171,12 @@ class WordpressProcessor:
         return checksum.hexdigest()
 
     def get_wordpress_version(self):
-        version = None
         path = os.path.join(self.wp_root, self.WP_VERSION_FILE)
         with open(path, mode='r') as f:
             for line in f:
                 if '$wp_version = ' in line:
                     return line.split("'")[1]
+        return ""
 
     def __init__(self, project_root):
         self.wp_root = project_root
