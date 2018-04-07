@@ -11,7 +11,6 @@ import time
 
 from util.file_preprocessing import preprocess
 from util.processors import GitProcessor as Git
-from util.processors import Processor
 from util.processors import WordpressProcessor as Wordpress
 from util.processors import YaraProcessor as Yara
 from util.result import Result
@@ -71,20 +70,20 @@ def print_results(results, duration):
 
 
 def scan(path_list, config):
-    wp = Processor()
-    git = Processor()
+    processors = []
     yara = Yara(SCRIPT_DIR)
     results = {}
 
     if not yara.ready():
         log.critical("Failed to start Yara.")
         sys.exit(1)
+    processors.append(yara)
 
     if config.wordpress_root:
-        wp = Wordpress(config.wordpress_root)
+        processors.append(Wordpress(config.wordpress_root))
 
     if config.git_root:
-        git = Git(config.git_root)
+        processors.append(Git(config.git_root))
 
     for path in path_list:
         if os.path.isdir(path):
@@ -98,7 +97,7 @@ def scan(path_list, config):
         log.debug("Scanning " + path)
         temp_path = preprocess(path, TMP_DIR)
 
-        for processor in yara, wp, git:
+        for processor in processors:
             if processor.ready():
                 log.debug("Running {} plugin".format(processor.get_processor_name()))
                 results[path].merge_with(processor.process(temp_path, path))
