@@ -108,7 +108,7 @@ class GitProcessor:
 
         try:
             git.Repo(path)
-        except git.exc.InvalidGitRepositoryError as e:
+        except git.exc.InvalidGitRepositoryError:
             return False
 
         return True
