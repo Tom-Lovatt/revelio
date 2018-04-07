@@ -8,6 +8,7 @@ import signal
 import sys
 import tempfile
 import time
+from time import sleep
 
 from util.file_preprocessing import preprocess
 from util.processors import GitProcessor as Git
@@ -103,6 +104,7 @@ def scan(path_list, config):
                 results[path].merge_with(processor.process(temp_path, path))
 
         os.unlink(temp_path)
+        sleep((3 - config.priority) * 0.05)
 
     return results
 
@@ -130,6 +132,10 @@ def process_arguments():
                         help="Lower the threshold for how suspicious a file needs to "
                              "be before it's reported. Can be specified up to 3 times, "
                              "increasing the level each time.")
+    parser.add_argument('-p', '--priority', action='count', default=0,
+                        help="Increase the priority of the scan. It will run quicker "
+                             "but take up more system resources. Can be specified up to 3 "
+                             "times, increasing the priority each time.")
     parser.add_argument(metavar="target directory", action="store", dest="targets", nargs='+')
 
     if len(sys.argv) == 1:
