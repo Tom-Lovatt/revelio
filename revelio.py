@@ -202,6 +202,7 @@ def configure_logger(config):
 def enumerate_files(paths, recursive=False):
     files = []
     for path in paths:
+        path = glob.escape(path)
         if os.path.isdir(path):
             path = os.path.join(path, '**')
         elif os.path.isfile(path) and '.php' not in path:
