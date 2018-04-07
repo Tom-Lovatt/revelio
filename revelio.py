@@ -123,7 +123,8 @@ def scan(path_list, config):
             print_progress(scan_count, num_targets, suspicious_count, config.start_time)
 
         os.unlink(temp_path)
-        sleep((3 - config.priority) * 0.05)
+        if config.priority < 3:
+            sleep((3 - config.priority) * 0.05)
 
     return results
 
@@ -152,15 +153,18 @@ def validate_file(path):
 
 def process_arguments():
     parser = argparse.ArgumentParser(description='Scan for malicious PHP files, particularly those using obfuscation.')
-    parser.add_argument('-f', '--log-file', action='store', default=None)
-    parser.add_argument('-r', '--recurse', action='store_true', default=False)
-    parser.add_argument('-v', '--verbose', action='store_true', default=False)
+    parser.add_argument('-f', '--log-file', action='store', default=None,
+                        help="Send all output to the specified file.")
+    parser.add_argument('-r', '--recurse', action='store_true', default=False,
+                        help="Search recursively within the target directory.")
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help="Show all debugging statements.")
     parser.add_argument('-g', '--git-root', action='store', default=False,
                         help="If target is part of a Git repo, supply the root directory to "
                              "use Git metadata in the scan. Note: This mode won't scan any "
                              "files or directories listed in .gitignore")
     parser.add_argument('-w', '--wordpress-root', action='store', default=False,
-                        help="If target is part of a Wordpress installation, specify"
+                        help="If target is part of a Wordpress installation, specify "
                              "the root directory to include hash verification in the scan")
     parser.add_argument('-a', '--aggressive-scan', action='count', default=0,
                         help="Lower the threshold for how suspicious a file needs to "
