@@ -63,8 +63,10 @@ def print_results(results, duration):
     for path, result in results.items():
         if result.score >= SCORE_ALERT_THRESHOLD:
             log.info('{} was flagged with the following notes: {}\n'.format(path, ', '.join(result.rules)))
-            log.debug('{} file had a score of {}'.format(path, result.score))
             flagged += 1
+        else:
+            log.debug('{} file had a score of {} with the following rules: {}'.format(
+                path, result.score, ', '.join(result.rules)))
 
     log.info("Scanned {} files in {}s, {} suspicious file(s) identified".format(
         len(results),
