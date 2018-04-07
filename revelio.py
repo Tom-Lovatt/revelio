@@ -62,7 +62,7 @@ def print_results(results, duration):
     flagged = 0
     for path, result in results.items():
         if result.score >= SCORE_ALERT_THRESHOLD:
-            log.info('{} was flagged with the following notes: {}'.format(path, ', '.join(result.rules)))
+            log.info('{} was flagged with the following notes: {}\n'.format(path, ', '.join(result.rules)))
             log.debug('{} file had a score of {}'.format(path, result.score))
             flagged += 1
 
