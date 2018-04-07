@@ -295,7 +295,7 @@ rule Content_Injection {
     strings:
         $s1 = "fputs("
 
-        $re1 = /fopen\([^)]*\.php/
+        $re1 = /fopen\([^)]*\.php[^,]*,\s*['"]w\+?['"]\s*\)/
 
     condition:
         all of them
