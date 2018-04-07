@@ -139,11 +139,13 @@ rule NetworkListener {
         score = 5
 
     strings:
-        $s1 = "socket->listen("
+        $s1 = "socket->listen"
         $s2 = "new Server("
         $s3 = "SOCKS server listening" nocase
         $s4 = "socks://"
         $s5 = "IIS://localhost/"
+        $s6 = "socket_listen"
+        $s7 = "socket_recv"
 
     condition:
         any of them
@@ -158,13 +160,11 @@ rule Password_Lock {
         score = 4
 
     strings:
-        $s1 = "md5($_REQUEST["
-        $s2 = "md5($_GET["
-        $s3 = "md5($_POST["
-        $s4 = "md5($pass" nocase
+        $s1 = "md5($pass" nocase
 
         $re1 = /header\(["']WWW-Authenticate/ nocase
         $re2 = /\$_REQUEST\[['"]pass/
+        $re3 = /md5\([^)]*\$_(GET|POST|REQUEST)\[[^\]]*\]\s*\)/
 
     condition:
         any of them
@@ -197,13 +197,16 @@ rule Uploader {
         $s4 = "file_put_contents("
 
         $re1 = /copy\(\$_FILES\[.*?\]\[['"]tmp_name['"]\]/
-        $re2 = /(fopen|fwrite|fputs)\([^)]*\$_(POST|GET|REQUEST)/
 
-        $re3 = /<\s*form/ nocase
-        $re4 = /<input[^>]*type=\\?["']?(file|text)/ nocase
+        $re2 = /<\s*form/ nocase
+        $re3 = /<input[^>]*type=\\?["']?(file|text)/ nocase
+
+        $re4 = /(fopen|fwrite|fputs)\([^)]*\$_(POST|GET|REQUEST)/
 
     condition:
-        1 of ($s*, $re1, $re2) and all of ($re3, $re4)
+        (1 of ($s*, $re1) and all of ($re2, $re3)) or
+        $re4
+
 }
 rule Permissive_Directories {
     meta:
@@ -366,4 +369,35 @@ rule Self_Modification {
 
     condition:
         $re1
+}
+rule UDP_Traffic {
+    meta:
+        score = 4
+
+    strings:
+        $s1 = "udp://"
+
+    condition:
+        $s1
+}
+rule Delete_PHP_Files {
+    meta:
+        score = 3
+
+    strings:
+        $re1 = /unlink\([^)]*\.php/ nocase
+
+    condition:
+        $re1
+}
+rule Error_Page_Masquerading {
+    meta:
+        score = 3
+
+    strings:
+        $s1 = "<title>404 Not Found</title>" nocase
+        $s2 = "while trying to use an ErrorDocument to handle the request" nocase
+
+    condition:
+        any of them
 }

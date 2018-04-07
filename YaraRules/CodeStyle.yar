@@ -89,3 +89,18 @@ rule Superglobal_Density {
         #s1*1.0 \ file_num_lines > 0.25
         and #s1 > 10
 }
+rule Password_In_Get_Param {
+    /**
+     * Having passwords in the URL is very bad practice
+     * but malicious code still does it for convenience
+     * and in cases where they can't accept POSTs
+     */
+    meta:
+        score = 5
+
+    strings:
+        $re1 = /\$_GET\[['"]password['"]\]/
+
+    condition:
+        $re1
+}
