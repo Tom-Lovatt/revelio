@@ -189,7 +189,8 @@ rule Bad_MIME_Type {
 
     strings:
         $re1 = /^GIF89a1/
+        $re2 = /^\?JFIF/
 
     condition:
-        $re1
+        any of them
 }

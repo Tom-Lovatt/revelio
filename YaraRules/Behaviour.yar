@@ -103,6 +103,7 @@ rule Directory_Lister {
         $re1 = /echo[^;]*getcwd\(/
         $re2 = /exec\(['"]pwd/
         $re3 = /echo[^;]*SCRIPT_FILENAME/
+        $re4 = /(print|echo)[^;]*scandir\(/
 
      condition:
         (any of ($s*) and (#ex1 + #ex2 < 2))

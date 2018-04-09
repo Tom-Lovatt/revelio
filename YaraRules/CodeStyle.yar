@@ -54,6 +54,8 @@ rule Create_And_Call_Function {
     strings:
         $s1 = "call_user_func(create_function("
         $s2 = "create_function(null"
+        $s3 = "create_function(\"\""
+        $s4 = "create_function(''"
 
     condition:
         any of them
