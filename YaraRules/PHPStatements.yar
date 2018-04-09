@@ -22,7 +22,7 @@ rule Evaluate_Dynamic_Input {
         score = 4
 
     strings:
-        $re1 = /(eval|assert)\([^);]*(file_get_contents|\$_REQUEST|\$_GET|\$_POST|getenv)/
+        $re1 = /(eval|assert)\([^);]*(file_get_contents|\$_REQUEST|\$_GET|\$_POST|\$_COOKIE|getenv)/
 
     condition:
         $re1
@@ -45,7 +45,7 @@ rule Include_Dynamic_Input {
         $s1 = "allow_url_include"
 
         $re1 = /include\(['"]php\:\/\/input['"]\)/
-        $re2 = /include\([^)]*(\$_REQUEST|\$_GET|\$_POST|getenv)/
+        $re2 = /include\([^)]*(\$_REQUEST|\$_GET|\$_POST|\$_COOKIE|getenv)/
 
     condition:
         any of them
@@ -260,7 +260,7 @@ rule Extract_User_Input {
 
         strings:
             $re1 = /extract\(\$HTTP_(GET|SERVER|POST)_VARS/
-            $re2 = /extract\(\$_(GET|POST|REQUEST)/
+            $re2 = /extract\(\$_(GET|POST|REQUEST|COOKIE)/
 
         condition:
             any of them

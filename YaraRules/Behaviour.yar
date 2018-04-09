@@ -13,7 +13,7 @@ rule Command_Passthrough {
         $s1 = "$_POST['cmd']"
         $s2 = "$_GET['cmd']"
 
-        $re1 = /(^|[^A-Za-z_])(shell_exec|passthru|system)\((\$_(REQUEST|GET|POST)|getenv)\(/ nocase
+        $re1 = /(^|[^A-Za-z_])(shell_exec|passthru|system)\((\$_(REQUEST|GET|POST|COOKIE)|getenv)\(/ nocase
         $re2 = /print\s*(shell_exec|passthru)\(/ nocase
 
     condition:
@@ -164,7 +164,7 @@ rule Password_Lock {
 
         $re1 = /header\(["']WWW-Authenticate/ nocase
         $re2 = /\$_REQUEST\[['"]pass/
-        $re3 = /md5\([^)]*\$_(GET|POST|REQUEST)\[[^\]]*\]\s*\)/
+        $re3 = /md5\([^)]*\$_(GET|POST|REQUEST|COOKIE)\[[^\]]*\]\s*\)/
 
     condition:
         any of them
@@ -201,7 +201,7 @@ rule Uploader {
         $re2 = /<\s*form/ nocase
         $re3 = /<input[^>]*type=\\?["']?(file|text)/ nocase
 
-        $re4 = /(fopen|fwrite|fputs)\([^)]*\$_(POST|GET|REQUEST)/
+        $re4 = /(fopen|fwrite|fputs)\([^)]*\$_(POST|GET|REQUEST|COOKIE)/
 
     condition:
         (1 of ($s*, $re1) and all of ($re2, $re3)) or
@@ -226,6 +226,7 @@ rule Echo_User_Input {
         $s1 = "echo $_REQUEST["
         $s2 = "echo $_GET["
         $s3 = "echo $_POST["
+        $s4 = "echo $_COOKIE["
 
     condition:
         any of them
