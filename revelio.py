@@ -172,10 +172,10 @@ def process_arguments():
                         help="Lower the threshold for how suspicious a file needs to "
                              "be before it's reported. Can be specified up to 3 times, "
                              "increasing the level each time.")
-    parser.add_argument('-p', '--priority', action='count', default=0,
-                        help="Increase the priority of the scan. It will run quicker "
-                             "but take up more system resources. Can be specified up to 3 "
-                             "times, increasing the priority each time.")
+    parser.add_argument('-p', '--priority', action='store', default=2,
+                        help="Set the priority of the scan, from 0-3. Higher priorities "
+                             "will complete faster but use more system resources.",
+                        type=int, choices=[0, 1, 2, 3])
     parser.add_argument(metavar="target directory", action="store", dest="targets", nargs='+')
 
     if len(sys.argv) == 1:
