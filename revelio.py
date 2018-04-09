@@ -1,6 +1,4 @@
 import argparse
-import glob
-import itertools
 import logging
 import os
 import shutil
@@ -94,7 +92,7 @@ def scan(path_list, config):
     if config.show_progress:
         path_list = list(path_list)
         num_targets = sum(1 for x in path_list)
-        log.info("{} files and directories found. Scanning...".format(num_targets))
+        log.info("{} files found. Scanning...".format(num_targets))
 
     last_update = time.time()
     scan_count = 0
@@ -114,7 +112,6 @@ def scan(path_list, config):
 
         for processor in processors:
             if processor.ready():
-                log.debug("Running {} plugin".format(processor.get_processor_name()))
                 results[path].merge_with(processor.process(temp_path, path))
 
         if results[path].score >= SCORE_ALERT_THRESHOLD:
@@ -200,18 +197,26 @@ def configure_logger(config):
 
 
 def enumerate_files(paths, recursive=False):
-    files = []
+    all_files = []
     for path in paths:
-        path = glob.escape(path)
-        if os.path.isdir(path):
-            path = os.path.join(path, '**')
-        elif os.path.isfile(path) and '.php' not in path:
-            log.warning(path + " doesn't have a .php extension. Including it in the scan "
-                               "but results may be inconsistent.")
+        if os.path.islink(path):
+            log.warning("Found a symlink at {}, not following.".format(path))
+            continue
+        if os.path.isfile(path):
+            all_files.append(path)
+            continue
 
-        files = itertools.chain(glob.iglob(path, recursive=recursive), files)
+        for dir_path, dir_names, filenames in os.walk(path):
+            for dir_name in dir_names:
+                full_dir_path = os.path.join(dir_path, dir_name)
+                if os.path.islink(full_dir_path):
+                    log.warning("Found a symlink at {}, not following.".format(full_dir_path))
+            for filename in filenames:
+                all_files.append(os.path.join(dir_path, filename))
+            if not recursive:
+                break
 
-    return files
+    return all_files
 
 
 if __name__ == '__main__':
