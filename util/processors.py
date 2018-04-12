@@ -90,7 +90,7 @@ class YaraProcessor(Processor):
         return 'Yara'
 
 
-class GitProcessor:
+class GitProcessor(Processor):
     # How much to increase/decrease the result score by
     # for (un)committed files
     UNCOMMITTED_FILES_WEIGHTING = 5
@@ -145,7 +145,7 @@ class GitProcessor:
         return 'Git'
 
 
-class WordpressProcessor:
+class WordpressProcessor(Processor):
     log = logging.getLogger(__name__)
 
     WP_CHECKSUM_URL = "https://api.wordpress.org/core/checksums/1.0/?version={}&locale=en_GB"
