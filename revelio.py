@@ -148,7 +148,7 @@ def scan(path_list: list, config) -> dict:
 
     if config.show_progress:
         path_list = list(path_list)
-        num_targets = sum(1 for x in path_list)
+        num_targets = len(path_list)
         log.info("{} files found. Scanning...".format(num_targets))
 
     last_update = time.time()
