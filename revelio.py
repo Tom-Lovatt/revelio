@@ -23,14 +23,10 @@ log = logging.getLogger(__name__)
 
 
 def main() -> None:
-    global SCORE_ALERT_THRESHOLD
-
     config = process_arguments()
-    config.start_time = time.time()
-    signal.signal(signal.SIGINT, exit_handler)
     configure_logger(config)
-    SCORE_ALERT_THRESHOLD -= config.aggressive_scan
-    config.show_progress = not config.log_file
+    # Catch CTRL-C interrupts
+    signal.signal(signal.SIGINT, exit_handler)
 
     log.info("Searching for files...")
     target_files = enumerate_files(config.targets, config.recurse)
@@ -55,10 +51,10 @@ def exit_handler() -> None:
     sys.exit(1)
 
 
-def print_results(results: dict, duration: float) -> None:
+def print_results(results: dict, duration: float, alert_threshold) -> None:
     flagged = 0
     for path, result in results.items():
-        if result.score >= SCORE_ALERT_THRESHOLD:
+        if result.score >= alert_threshold:
             log.info('{} was flagged with the following notes: {}\n'.format(path, ', '.join(result.rules)))
             flagged += 1
         else:
@@ -120,7 +116,7 @@ def scan(path_list: list, config) -> dict:
             if processor.ready():
                 results[path].merge_with(processor.process(temp_path, path))
 
-        if results[path].score >= SCORE_ALERT_THRESHOLD:
+        if results[path].score >= config.score_alert_threshold:
             suspicious_count += 1
 
         if config.show_progress and time.time() > last_update + PROGRESS_UPDATE_PERIOD:
@@ -185,7 +181,12 @@ def process_arguments() -> Any:
         parser.print_help()
         sys.exit(1)
 
-    return parser.parse_args()
+    config = parser.parse_args()
+    config.start_time = time.time()
+    config.score_alert_threshold = SCORE_ALERT_THRESHOLD - config.aggressive_scan
+    config.show_progress = not config.log_file
+
+    return config
 
 
 def configure_logger(config: Any) -> None:
