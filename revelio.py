@@ -7,7 +7,7 @@ import sys
 import tempfile
 import time
 from time import sleep
-from typing import Any, List
+from typing import Any, List, Dict
 
 from util.file_preprocessing import preprocess
 from util.processors import BaseProcessor, GitProcessor, WordpressProcessor, YaraProcessor
@@ -38,9 +38,15 @@ def main() -> None:
         log.warning(msg)
 
     print_results(results, time.time() - config.start_time, config.score_alert_threshold)
+    exit_handler()
 
 
 def process_arguments() -> Any:
+    """
+    Process command line arguments into a single config object.
+
+    :return: The ArgParse namespace
+    """
     parser = argparse.ArgumentParser(description='Scan for malicious PHP files, particularly those using obfuscation.')
     parser.add_argument('-f', '--log-file', action='store', default=None,
                         help="Send all output to the specified file.")
@@ -78,6 +84,9 @@ def process_arguments() -> Any:
 
 
 def configure_logger(config: Any) -> None:
+    """
+    Set the appropriate verbosity and destination for logging output.
+    """
     verbosity = logging.DEBUG if config.verbose else logging.INFO
     fmt = '[%(asctime)s] [%(levelname)s] - %(message)s'
     datefmt = '%Y-%m-%d %H:%M:%S'
@@ -92,6 +101,9 @@ def configure_logger(config: Any) -> None:
 
 
 def get_processors(config: Any) -> List[BaseProcessor]:
+    """
+    Build a list of Processors to scan files with.
+    """
     processors = []
     yara = YaraProcessor(SCRIPT_DIR)
 
@@ -109,10 +121,14 @@ def get_processors(config: Any) -> List[BaseProcessor]:
     return processors
 
 
-def get_file_list(paths: List[str], recursive=False) -> List[str]:
+def get_file_list(paths: List[str], recursive=False, follow_links=False) -> List[str]:
+    """
+    Find files from within a list of paths with optional recursion.
+    Warning: Symlinks will not be followed by default.
+    """
     all_files = []
     for path in paths:
-        if os.path.islink(path):
+        if os.path.islink(path) and not follow_links:
             log.warning("Found a symlink at {}, not following.".format(path))
             continue
         if os.path.isfile(path):
@@ -133,13 +149,20 @@ def get_file_list(paths: List[str], recursive=False) -> List[str]:
 
 
 def validate_file(path: str) -> bool:
+    """
+    Simple check to see if a path looks like a PHP file
+    """
     return (
         '.php' in path.lower() and
         os.path.isfile(path)
     )
 
 
-def scan(path_list: list, config) -> dict:
+def scan(path_list: List[str], config: Any) -> Dict[str, Result]:
+    """
+    For each of the given file paths, scan it for malicious PHP
+    patterns and assign it a score based on how suspicious it seems.
+    """
     processors = get_processors(config)
     num_targets = -1
     scan_count = 0
@@ -161,10 +184,8 @@ def scan(path_list: list, config) -> dict:
             continue
 
         results[path] = Result()
-
         log.debug("Scanning " + path)
         temp_path = preprocess(path, TMP_DIR)
-
         for processor in processors:
             if processor.ready():
                 results[path].merge_with(processor.process(temp_path, path))
@@ -184,6 +205,9 @@ def scan(path_list: list, config) -> dict:
 
 
 def print_progress(scanned: int, total: int, suspicious: int, start_time: float) -> None:
+    """
+    Display the current progress of the scan and estimated finish time.
+    """
     completion = round((scanned * 1.0 / total) * 100, 2)
     completion_time = (time.time() - start_time) / scanned * (total - scanned)
     if completion_time >= 60:
@@ -198,7 +222,10 @@ def print_progress(scanned: int, total: int, suspicious: int, start_time: float)
              )
 
 
-def print_results(results: dict, duration: float, alert_threshold) -> None:
+def print_results(results: dict, duration: float, alert_threshold: int) -> None:
+    """
+    Display the final list of suspicious files along with a summary of the scan.
+    """
     flagged = 0
     for path, result in results.items():
         if result.score >= alert_threshold:
@@ -215,15 +242,19 @@ def print_results(results: dict, duration: float, alert_threshold) -> None:
     ))
 
 
-def exit_handler() -> None:
-    log.critical("Caught exit signal, cleaning up and exiting.")
+def exit_handler(exit_signal: int=0) -> None:
+    """
+     Clean up any temp files before exiting.
+    """
+    if exit_signal:
+        log.critical("Caught exit signal, cleaning up and exiting.")
     if os.path.isdir(TMP_DIR):
         try:
             shutil.rmtree(TMP_DIR)
         except IOError as e:
             log.error("Couldn't clean up temp files, failed to delete {}: {}".format(TMP_DIR, e))
 
-    sys.exit(1)
+    sys.exit(exit_signal)
 
 
 if __name__ == '__main__':

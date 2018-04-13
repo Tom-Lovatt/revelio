@@ -25,16 +25,19 @@ class BaseProcessor(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def process(self, temp_path: str, real_path: str) -> Result:
         """
+        Scan a file for malicious patterns.
 
-        :param temp_path:
-        :param real_path:
-        :return:
+        :param temp_path: Path to a copy of the file that has undergone preprocessing.
+        :param real_path: Path to the original file.
         """
         raise NotImplementedError()
 
     @staticmethod
     @abc.abstractmethod
     def get_processor_name() -> str:
+        """
+        Return a human-readable name of this processor.
+        """
         raise NotImplementedError()
 
 
