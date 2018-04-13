@@ -1,5 +1,5 @@
 class Result:
-    def __init__(self, ):
+    def __init__(self):
         self.rules = []
         self.strings = []
         self.score = 0
@@ -14,7 +14,10 @@ class Result:
     def __setitem__(self, attr, value):
         return setattr(self, attr, value)
 
-    def merge_with(self, result):
+    def merge_with(self, result: dict) -> None:
+        """
+        Merge the values from the given Result|dict into this object
+        """
         for attr in self:
             if result and attr in result:
                 assert isinstance(result[attr], type(self[attr]))

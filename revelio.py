@@ -7,11 +7,10 @@ import sys
 import tempfile
 import time
 from time import sleep
+from typing import Any, List
 
 from util.file_preprocessing import preprocess
-from util.processors import GitProcessor as Git
-from util.processors import WordpressProcessor as Wordpress
-from util.processors import YaraProcessor as Yara
+from util.processors import BaseProcessor, GitProcessor, WordpressProcessor, YaraProcessor
 from util.result import Result
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -23,7 +22,7 @@ PROGRESS_UPDATE_PERIOD = 10
 log = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
     global SCORE_ALERT_THRESHOLD
 
     config = process_arguments()
@@ -45,7 +44,7 @@ def main():
     print_results(results, time.time() - config.start_time)
 
 
-def exit_handler(signal, frame):
+def exit_handler() -> None:
     log.critical("Caught exit signal, cleaning up and exiting.")
     if os.path.isdir(TMP_DIR):
         try:
@@ -56,7 +55,7 @@ def exit_handler(signal, frame):
     sys.exit(1)
 
 
-def print_results(results, duration):
+def print_results(results: dict, duration: float) -> None:
     flagged = 0
     for path, result in results.items():
         if result.score >= SCORE_ALERT_THRESHOLD:
@@ -73,10 +72,9 @@ def print_results(results, duration):
     ))
 
 
-def scan(path_list, config):
+def get_processors(config: Any) -> List[BaseProcessor]:
     processors = []
-    yara = Yara(SCRIPT_DIR)
-    results = {}
+    yara = YaraProcessor(SCRIPT_DIR)
 
     if not yara.ready():
         log.critical("Failed to start Yara.")
@@ -84,10 +82,20 @@ def scan(path_list, config):
     processors.append(yara)
 
     if config.wordpress_root:
-        processors.append(Wordpress(config.wordpress_root))
+        processors.append(WordpressProcessor(config.wordpress_root))
 
     if config.git_root:
-        processors.append(Git(config.git_root))
+        processors.append(GitProcessor(config.git_root))
+
+    return processors
+
+
+def scan(path_list: list, config) -> dict:
+    processors = get_processors(config)
+    num_targets = -1
+    scan_count = 0
+    suspicious_count = 0
+    results = {}
 
     if config.show_progress:
         path_list = list(path_list)
@@ -95,8 +103,6 @@ def scan(path_list, config):
         log.info("{} files found. Scanning...".format(num_targets))
 
     last_update = time.time()
-    scan_count = 0
-    suspicious_count = 0
     for path in path_list:
         scan_count += 1
         if os.path.isdir(path):
@@ -128,9 +134,9 @@ def scan(path_list, config):
     return results
 
 
-def print_progress(scan_count, total_count, suspicious_count, start_time):
-    completion = round((scan_count * 1.0 / total_count) * 100, 2)
-    completion_time = (time.time() - start_time) / scan_count * (total_count - scan_count)
+def print_progress(scanned: int, total: int, suspicious: int, start_time: float) -> None:
+    completion = round((scanned * 1.0 / total) * 100, 2)
+    completion_time = (time.time() - start_time) / scanned * (total - scanned)
     if completion_time >= 60:
         completion_time = int(completion_time / 60)
         completion_time = str(completion_time) + (" minutes" if completion_time > 1 else " minute")
@@ -138,19 +144,19 @@ def print_progress(scan_count, total_count, suspicious_count, start_time):
         completion_time = "<1 minute"
 
     log.info("{} files scanned, {} suspicious files found, {}% complete. ".format(
-        scan_count, suspicious_count, completion)
+        scanned, suspicious, completion)
              + "Estimate {} until completion.".format(completion_time)
              )
 
 
-def validate_file(path):
+def validate_file(path: str) -> bool:
     return (
         '.php' in path.lower() and
         os.path.isfile(path)
     )
 
 
-def process_arguments():
+def process_arguments() -> Any:
     parser = argparse.ArgumentParser(description='Scan for malicious PHP files, particularly those using obfuscation.')
     parser.add_argument('-f', '--log-file', action='store', default=None,
                         help="Send all output to the specified file.")
@@ -182,7 +188,7 @@ def process_arguments():
     return parser.parse_args()
 
 
-def configure_logger(config):
+def configure_logger(config: Any) -> None:
     verbosity = logging.DEBUG if config.verbose else logging.INFO
     fmt = '[%(asctime)s] [%(levelname)s] - %(message)s'
     datefmt = '%Y-%m-%d %H:%M:%S'
@@ -196,7 +202,7 @@ def configure_logger(config):
     logging.basicConfig(level=verbosity, format=fmt, datefmt=datefmt, handlers=handlers)
 
 
-def enumerate_files(paths, recursive=False):
+def enumerate_files(paths: List[str], recursive=False) -> List[str]:
     all_files = []
     for path in paths:
         if os.path.islink(path):
