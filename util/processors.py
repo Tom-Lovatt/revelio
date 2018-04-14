@@ -53,8 +53,6 @@ class YaraProcessor(BaseProcessor):
     }
     yara_rules_path = 'YaraRules/Index.yar'
 
-    init_succeeded = False
-
     def __init__(self, project_root: str):
         """
         :param project_root: Path to the folder containing the YaraRules directory
