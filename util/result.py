@@ -3,10 +3,13 @@ class Result:
     Contains all match data for a given file i.e how highly it scores,
     which processors flagged it as suspicious etc.
     """
-    def __init__(self):
+    DEFAULT_SUSPICIOUS_THRESHOLD = 5
+
+    def __init__(self, suspicious_threshold=DEFAULT_SUSPICIOUS_THRESHOLD):
         self.rules = []
         self.strings = []
         self.score = 0
+        self.suspicious_threshold = suspicious_threshold
 
     def __iter__(self):
         for key in self.__dict__:
@@ -26,3 +29,10 @@ class Result:
             if result and attr in result:
                 assert isinstance(result[attr], type(self[attr]))
                 self[attr] += result[attr]
+
+    def is_suspicious(self) -> bool:
+        """
+        Check if the Result's score is high enough to be flagged
+        as suspicious
+        """
+        return self.score >= self.suspicious_threshold

@@ -16,7 +16,6 @@ from util.result import Result
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 TMP_DIR = os.path.join(tempfile.gettempdir(), 'revelio')
 
-SCORE_ALERT_THRESHOLD = 5
 PROGRESS_UPDATE_PERIOD = 10
 
 log = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ def main() -> None:
         msg += " Did you mean to supply the --recurse flag?" if not config.recurse else ""
         log.warning(msg)
 
-    print_results(results, time.time() - config.start_time, config.score_alert_threshold)
+    print_results(results, time.time() - config.start_time)
     exit_handler()
 
 
@@ -77,7 +76,7 @@ def process_arguments() -> Any:
 
     config = parser.parse_args()
     config.start_time = time.time()
-    config.score_alert_threshold = SCORE_ALERT_THRESHOLD - config.aggressive_scan
+    config.score_alert_threshold = Result.DEFAULT_SUSPICIOUS_THRESHOLD - config.aggressive_scan
     config.show_progress = not config.log_file
 
     return config
@@ -183,14 +182,14 @@ def scan(path_list: List[str], config: Any) -> Dict[str, Result]:
             log.debug(path + " doesn't look like a PHP file, skipping.")
             continue
 
-        results[path] = Result()
+        results[path] = Result(config.score_alert_threshold)
         log.debug("Scanning " + path)
         temp_path = preprocess(path, TMP_DIR)
         for processor in processors:
             if processor.ready():
                 results[path].merge_with(processor.process(temp_path, path))
 
-        if results[path].score >= config.score_alert_threshold:
+        if results[path].is_suspicious():
             suspicious_count += 1
 
         if config.show_progress and time.time() > last_update + PROGRESS_UPDATE_PERIOD:
@@ -216,19 +215,19 @@ def print_progress(scanned: int, total: int, suspicious: int, start_time: float)
     else:
         completion_time = "<1 minute"
 
-    log.info("{} files scanned, {} suspicious files found, {}% complete. ".format(
+    log.info("{} PHP files scanned, {} suspicious files found, {}% complete. ".format(
         scanned, suspicious, completion)
              + "Estimate {} until completion.".format(completion_time)
              )
 
 
-def print_results(results: dict, duration: float, alert_threshold: int) -> None:
+def print_results(results: dict, duration: float) -> None:
     """
     Display the final list of suspicious files along with a summary of the scan.
     """
     flagged = 0
     for path, result in results.items():
-        if result.score >= alert_threshold:
+        if result.is_suspicious():
             log.info('{} was flagged with the following notes: {}\n'.format(path, ', '.join(result.rules)))
             flagged += 1
         else:
