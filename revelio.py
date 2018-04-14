@@ -242,7 +242,7 @@ def print_results(results: dict, duration: float, alert_threshold: int) -> None:
     ))
 
 
-def exit_handler(exit_signal: int=0) -> None:
+def exit_handler(exit_signal: int=0, frame: Any=None) -> None:
     """
      Clean up any temp files before exiting.
     """
