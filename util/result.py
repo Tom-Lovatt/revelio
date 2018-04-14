@@ -1,4 +1,8 @@
 class Result:
+    """
+    Contains all match data for a given file i.e how highly it scores,
+    which processors flagged it as suspicious etc.
+    """
     def __init__(self):
         self.rules = []
         self.strings = []

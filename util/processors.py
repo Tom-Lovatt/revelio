@@ -42,6 +42,10 @@ class BaseProcessor(metaclass=abc.ABCMeta):
 
 
 class YaraProcessor(BaseProcessor):
+    """
+    Scan a file using a variety of Yara rules to detect
+    malicious PHP activity.
+    """
 
     EXTERNAL_VARS_TEMPLATE = {
         'file_num_lines': 0,
@@ -52,21 +56,28 @@ class YaraProcessor(BaseProcessor):
     init_succeeded = False
 
     def __init__(self, project_root: str):
+        """
+        :param project_root: Path to the folder containing the YaraRules directory
+        """
         self.yara_rules_path = os.path.join(project_root, self.yara_rules_path)
-        self.init_succeeded = self.check_rules_files()
+        self.init_succeeded = self.__check_rules_files()
 
     def ready(self) -> bool:
         return self.init_succeeded
 
     def process(self, temp_path: str, real_path: str) -> Result:
-        externals = self.gather_file_statistics(temp_path)
+        externals = self.__gather_file_statistics(temp_path)
         rules = yara.compile(filepath=self.yara_rules_path, externals=externals)
         matches = rules.match(temp_path)
-        result = self.process_matches(matches)
+        result = self.__process_matches(matches)
 
         return result
 
-    def check_rules_files(self) -> bool:
+    @staticmethod
+    def get_processor_name() -> str:
+        return 'Yara'
+
+    def __check_rules_files(self) -> bool:
         try:
             yara.compile(filepath=self.yara_rules_path, externals=YaraProcessor.EXTERNAL_VARS_TEMPLATE)
         except (IOError, yara.Error) as e:
@@ -76,7 +87,7 @@ class YaraProcessor(BaseProcessor):
             return False
         return True
 
-    def gather_file_statistics(self, file_path: str) -> dict:
+    def __gather_file_statistics(self, file_path: str) -> dict:
         ext_vars = dict(self.EXTERNAL_VARS_TEMPLATE)
         # This covers most encoded and compressed strings
         regex = re.compile('[^a-zA-Z0-9/+_]')
@@ -89,7 +100,7 @@ class YaraProcessor(BaseProcessor):
         return ext_vars
 
     @staticmethod
-    def process_matches(matches: list) -> Result:
+    def __process_matches(matches: list) -> Result:
         result = Result()
         for match in matches:
             result.merge_with({
@@ -100,12 +111,11 @@ class YaraProcessor(BaseProcessor):
 
         return result
 
-    @staticmethod
-    def get_processor_name() -> str:
-        return 'Yara'
-
 
 class GitProcessor(BaseProcessor):
+    """
+    Check files against a Git repo for untracked changes
+    """
     # How much to increase/decrease the result score by
     # for (un)committed files
     UNCOMMITTED_FILES_WEIGHTING = 5
@@ -115,7 +125,10 @@ class GitProcessor(BaseProcessor):
     repo = None
 
     def __init__(self, project_root: str):
-        if not self.is_git_dir(project_root):
+        """
+        :param project_root: Path to the root of the Git repo
+        """
+        if not self.__is_git_dir(project_root):
             self.log.warning(project_root + " doesn't look like a Git repo, disabling the Git plugin.")
         else:
             self.repo = git.Repo(project_root)
@@ -127,7 +140,7 @@ class GitProcessor(BaseProcessor):
     def process(self, temp_path: str, real_path: str) -> Result:
         result = Result()
         path = real_path.replace(self.git_root, '')
-        if self.is_file_changed(path):
+        if self.__is_file_changed(path):
             result.score = self.UNCOMMITTED_FILES_WEIGHTING
             result.rules = ['Git_Uncommitted_Changes']
         else:
@@ -140,7 +153,7 @@ class GitProcessor(BaseProcessor):
         return 'Git'
 
     @staticmethod
-    def is_git_dir(path: str) -> bool:
+    def __is_git_dir(path: str) -> bool:
         if not (os.path.exists(path) and os.path.isdir(path)):
             return False
 
@@ -151,7 +164,7 @@ class GitProcessor(BaseProcessor):
 
         return True
 
-    def is_file_changed(self, path: str) -> bool:
+    def __is_file_changed(self, path: str) -> bool:
         return (
             path in self.repo.untracked_files or
             self.repo.git.diff(None, 'HEAD', path)
@@ -159,6 +172,10 @@ class GitProcessor(BaseProcessor):
 
 
 class WordpressProcessor(BaseProcessor):
+    """
+    Verify Wordpress core files against MD5 checksums provided
+    by the Wordpress API
+    """
     WP_CHECKSUM_URL = "https://api.wordpress.org/core/checksums/1.0/?version={}&locale=en_GB"
     WP_VERSION_FILE = "wp-includes/version.php"
 
@@ -169,8 +186,11 @@ class WordpressProcessor(BaseProcessor):
     wp_checksums = {}
 
     def __init__(self, project_root: str):
+        """
+        :param project_root: Path to the root of the Wordpress installation
+        """
         self.wp_root = project_root
-        version = self.get_wordpress_version()
+        version = self.__get_wordpress_version()
         self.log.debug("Fetching checksums for Wordpress v" + version)
 
         try:
@@ -190,7 +210,7 @@ class WordpressProcessor(BaseProcessor):
 
         if wp_path not in self.wp_checksums:
             return result
-        elif self.wp_checksums[wp_path] != self.get_file_checksum(real_path):
+        elif self.wp_checksums[wp_path] != self.__get_file_checksum(real_path):
             result.rules.append('Hash_Verification_Failure')
             result.score = self.HASH_SCORE_WEIGHTING
         else:
@@ -204,12 +224,19 @@ class WordpressProcessor(BaseProcessor):
         return 'Wordpress'
 
     @staticmethod
-    def is_wordpress_root(path: str) -> bool:
+    def __is_wordpress_root(path: str) -> bool:
+        """
+        Determines if a given path is the root directory of a Wordpress installation
+        by verifying the existence of the version file.
+        """
         version_file_path = os.path.join(path, WordpressProcessor.WP_VERSION_FILE)
         return os.path.isfile(version_file_path)
 
     @staticmethod
-    def get_file_checksum(path: str) -> str:
+    def __get_file_checksum(path: str) -> str:
+        """
+        Calculate an MD5 checksum for a given file
+        """
         checksum = md5()
         with open(path, "rb") as f:
             for line in f:
@@ -217,7 +244,10 @@ class WordpressProcessor(BaseProcessor):
 
         return checksum.hexdigest()
 
-    def get_wordpress_version(self) -> str:
+    def __get_wordpress_version(self) -> str:
+        """
+        Get the version number of this Wordpress installation
+        """
         path = os.path.join(self.wp_root, self.WP_VERSION_FILE)
         with open(path, mode='r') as f:
             for line in f:
