@@ -1,9 +1,10 @@
-/**
+/*
  * <PHP Statements>
  * These rules cover commonly abused PHP statements, related
  * to obfuscation and executing commands.
  *
  */
+
 rule Evaluate {
     meta:
         score = 1
@@ -130,7 +131,7 @@ rule OS_Commands {
         any of them
 }
 rule No_Keywords {
-    /**
+    /*
      * Some scripts obfuscate everything, including normal PHP.
      * If none of PHP's keywords appear at all, it's likely obfuscated.
      * 'as', 'do', and 'echo' don't appear below. The first two are
@@ -201,6 +202,10 @@ rule No_Keywords {
         $s1 and not (any of ($ex*))
 }
 rule ExecuteRegex {
+        /*
+         * Passing the 'e' flag to preg_replace will evaluate the replace
+         * pattern as PHP code. Deprecated in PHP 5.5.0, removed in PHP 7.0.0
+         */
         meta:
             score = 5
 
@@ -211,6 +216,10 @@ rule ExecuteRegex {
             $re1
 }
 rule Server_Info {
+        /*
+         * Some malicious files will just expose sensitive server information
+         * for use in further attacks.
+         */
         meta:
             score = 3
 
@@ -228,7 +237,7 @@ rule Server_Info {
             or ($s1 and not $ex1)
 }
 rule Risky_Statements_Per_Line {
-        /**
+        /*
          * When legitimate code uses risky statements as
          * detected above, it usually has a large amount
          * of other functionality, making for larger files.
@@ -250,7 +259,7 @@ rule Risky_Statements_Per_Line {
             )
 }
 rule Extract_User_Input {
-        /**
+        /*
          * Extract imports variables from an array, overwriting
          * existing ones if necessary, making it very dangerous
          * to use on user input.

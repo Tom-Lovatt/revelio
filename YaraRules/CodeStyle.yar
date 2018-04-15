@@ -1,4 +1,4 @@
-/**
+/*
  * <Code style>
  * Most programmers optimise their code style for readability
  * and maintainability; malware generators do the opposite.
@@ -6,7 +6,10 @@
  */
 
 rule Statements_Per_Line {
-    /** Can produce false positive where minified JS is printed by PHP */
+    /*
+     * A high statement/line count can indicate minified PHP.
+     * Can produce false positive where minified JS is printed by PHP
+     */
     meta:
         score = 3
 
@@ -18,8 +21,10 @@ rule Statements_Per_Line {
         and file_num_lines > 5
 }
 rule Whitespace_Hiding_Injection {
-    /* Whitespace following the PHP tag is often used
-     to push injected code out of an editor window */
+    /*
+     * Whitespace following the PHP tag is often used to push
+     * injected code out of an editor window
+     */
     meta:
         score = 4
 
@@ -61,7 +66,7 @@ rule Create_And_Call_Function {
         any of them
 }
 rule Hardcoded_IP_Addresses {
-    /**
+    /*
      * Legitimate code usually favours domain names over
      * hardcoded IP addresses, except in the local address
      * ranges.
@@ -81,6 +86,10 @@ rule Hardcoded_IP_Addresses {
         $re1 and not (1 of ($ex*))
 }
 rule Superglobal_Density {
+    /*
+     * Superglobals can increase the persistence and
+     * accessibility of web shells
+     */
     meta:
         score = 2
 
@@ -92,7 +101,7 @@ rule Superglobal_Density {
         and #s1 > 10
 }
 rule Password_In_Get_Param {
-    /**
+    /*
      * Having passwords in the URL is very bad practice
      * but malicious code still does it for convenience
      * and in cases where they can't accept POSTs

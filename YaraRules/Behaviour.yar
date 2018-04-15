@@ -1,11 +1,15 @@
-/**
+/*
  * <Behaviour>
- * This looks at malicious behaviour
- *
- *
+ * This looks at how malicious files behave and what services
+ * they offer. These are generally used by a very small minority
+ * of legitimate files, if at all.
  */
 
 rule Command_Passthrough {
+    /*
+     * This is the basis for interactive shells, which simply
+     * execute user input as an OS-level command
+     */
     meta:
         score = 5
 
@@ -20,6 +24,10 @@ rule Command_Passthrough {
         any of them
 }
 rule System_Files {
+    /*
+     * Access to sensitive system files can be used to escalate
+     * privileges or pivot to other servers/services
+     */
     meta:
         score = 4
 
@@ -44,7 +52,7 @@ rule System_Files {
         any of them
 }
 rule File_Manipulation {
-    /**
+    /*
      * Most PHP files will match at least one of these strings
      * Webshells will match a large number since they tend to
      * to give total filesystem access to the user
@@ -83,7 +91,7 @@ rule File_Manipulation {
         or 1 of ($re*)
 }
 rule Directory_Lister {
-    /**
+    /*
      * Similar to above but less functionality. Prints a
      * directory tree on page load, hence the frequent lack of
      * a function or class definition
@@ -110,6 +118,10 @@ rule Directory_Lister {
         or any of ($re*)
 }
 rule Self_Deletion {
+    /*
+     * Some infected files propagate across the system then
+     * delete the installer to reduce visibility
+     */
     meta:
         score = 5
 
@@ -120,6 +132,10 @@ rule Self_Deletion {
         $s1
 }
 rule Mailers {
+    /*
+     * Lightweight mailing scripts can use the infected
+     * server to spread spam.
+     */
     meta:
         score = 5
 
@@ -136,6 +152,10 @@ rule Mailers {
         2 of them
 }
 rule NetworkListener {
+    /*
+     * Setting up a network listener can allow
+     * attackers out-of-band access
+     */
     meta:
         score = 5
 
@@ -152,7 +172,7 @@ rule NetworkListener {
         any of them
 }
 rule Password_Lock {
-    /**
+    /*
      * Some webshells have rudimentary login functionality.
      * Since they're standalone, they tend not to use sessions
      * for authentication.
@@ -172,7 +192,7 @@ rule Password_Lock {
 
 }
 rule Session_Management {
-    /**
+    /*
      * As above, but smart enough to use sessions.
      * Not scored as highly since sessions are used
      * far more legitimately.
@@ -188,6 +208,10 @@ rule Session_Management {
         any of them
 }
 rule Uploader {
+    /*
+     * A simple form and upload handler in a single
+     * file, making it easier to upload additional malicious files.
+     */
     meta:
         score = 5
 
@@ -210,6 +234,10 @@ rule Uploader {
 
 }
 rule Permissive_Directories {
+    /*
+     * Directories in octal mode 777 are readable and
+     * writable by anyone
+     */
     meta:
         score = 3
 
@@ -220,6 +248,10 @@ rule Permissive_Directories {
         $re1
 }
 rule Echo_User_Input {
+    /*
+     * Directly echoing user input can be used to
+     * execute arbitrary code
+     */
     meta:
         score = 3
 
@@ -233,6 +265,10 @@ rule Echo_User_Input {
         any of them
 }
 rule Database_Interaction {
+    /*
+     * Site compromises are often used to gain access
+     * to the database and dump as much of it as possible
+     */
     meta:
         score = 5
 
@@ -255,6 +291,10 @@ rule Database_Interaction {
         any of them
 }
 rule Privilege_Escalation {
+    /*
+     * Many web shells contain features to help aid OS-level
+     * privilege escalation, like searching for SUID/SGID files
+     */
     meta:
         score = 5
 
@@ -265,6 +305,11 @@ rule Privilege_Escalation {
         $re1
 }
 rule Possible_Spam {
+    /*
+     * Some scripts display different content depending on
+     * user agent, either to show spam only to search engines or
+     * to hide malicious functionality from crawlers
+     */
     meta:
         score = 5
 
@@ -294,6 +339,10 @@ rule Possible_Spam {
 
 }
 rule Content_Injection {
+    /*
+     * Appending content to other PHP files is one method
+     * for infecting or defacing them.
+     */
     meta:
         score = 5
 
@@ -306,6 +355,10 @@ rule Content_Injection {
         all of them
 }
 rule Search_Spam {
+    /*
+     * Some services exist to artificially inflate traffic
+     * for particular search terms.
+     */
     meta:
         score = 5
 
@@ -317,6 +370,9 @@ rule Search_Spam {
         all of them
 }
 rule Ftp_Activity {
+    /*
+     * FTP connections can be used for pivoting and privilege escalation.
+     */
     meta:
         score = 2
 
@@ -327,16 +383,24 @@ rule Ftp_Activity {
         $s1
 }
 rule Local_Curl {
+    /*
+     * Curling local URLs can be used to bypass some security
+     * measures and file include detection
+     */
     meta:
         score = 3
 
     strings:
-        $re1 = /curl_setopt\([^)]*file:\/\//
+        $re1 = /curl_setopt\([^)]*(file|ftp):\/\//
 
     condition:
         $re1
 }
 rule Remote_Shell {
+    /*
+     * Scripts can combine a network listener with OS commands
+     * to create a remote shell, similar to telnet/SSH
+     */
     meta:
         score = 5
 
@@ -351,6 +415,11 @@ rule Remote_Shell {
         $s1 and 1 of ($s2, $s3) and $re1
 }
 rule Compressor {
+    /*
+     * Manually writing compressed files to disk can be used to
+     * quickly download entire directories without relying on
+     * library functions.
+     */
     meta:
         score = 4
 
@@ -363,6 +432,11 @@ rule Compressor {
 
 }
 rule Self_Modification {
+    /*
+     * Some advanced shells can update themselves to newer
+     * versions. Simpler scripts sometimes use self-modification
+     * for rudimentary chatrooms or defacements
+     */
     meta:
         score = 4
 
@@ -373,6 +447,10 @@ rule Self_Modification {
         $re1
 }
 rule UDP_Traffic {
+    /*
+     * UDP traffic is rarely used in web applications but
+     * is heavily used in DDOS attacks
+     */
     meta:
         score = 4
 
@@ -383,6 +461,10 @@ rule UDP_Traffic {
         $s1
 }
 rule Delete_PHP_Files {
+    /*
+     * Similar to self-deletion, but can be used to hide other
+     * infected files after use, not just the calling script.
+     */
     meta:
         score = 3
 
@@ -393,6 +475,10 @@ rule Delete_PHP_Files {
         $re1
 }
 rule Error_Page_Masquerading {
+    /*
+     * Many shells emulate default error pages to avoid suspicion
+     * if an unsuspecting user browse to them
+     */
     meta:
         score = 3
 
