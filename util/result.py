@@ -5,7 +5,7 @@ class Result:
     """
     DEFAULT_SUSPICIOUS_THRESHOLD = 5
 
-    def __init__(self, suspicious_threshold=DEFAULT_SUSPICIOUS_THRESHOLD):
+    def __init__(self, suspicious_threshold: int=DEFAULT_SUSPICIOUS_THRESHOLD):
         self.rules = []
         self.strings = []
         self.score = 0
@@ -25,7 +25,7 @@ class Result:
         """
         Merge the values from the given Result|dict into this object
         """
-        for attr in self:
+        for attr in 'rules', 'strings', 'score':
             if result and attr in result:
                 assert isinstance(result[attr], type(self[attr]))
                 self[attr] += result[attr]
