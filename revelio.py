@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import logging
 import os
 import shutil
@@ -14,7 +15,10 @@ from util.processors import BaseProcessor, GitProcessor, WordpressProcessor, Yar
 from util.result import Result
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
-TMP_DIR = os.path.join(tempfile.gettempdir(), 'revelio')
+TMP_DIR = os.path.join(
+    tempfile.gettempdir(),
+    'revelio-'.format(datetime.datetime.now().strftime("%s"))
+)
 
 PROGRESS_UPDATE_PERIOD = 10
 
