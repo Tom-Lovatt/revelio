@@ -131,6 +131,7 @@ class GitProcessor(BaseProcessor):
         else:
             self.repo = git.Repo(project_root)
             self.git_root = project_root
+            self.changed_files = self.repo.untracked_files + [ item.a_path for item in self.repo.index.diff(None) ]
 
     def ready(self) -> bool:
         return len(self.git_root) > 0
@@ -138,7 +139,7 @@ class GitProcessor(BaseProcessor):
     def process(self, temp_path: str, real_path: str) -> Result:
         result = Result()
         path = real_path.replace(self.git_root, '')
-        if self.__is_file_changed(path):
+        if path in self.changed_files:
             result.score = self.UNCOMMITTED_FILES_WEIGHTING
             result.rules = ['Git_Uncommitted_Changes']
         else:
@@ -161,12 +162,6 @@ class GitProcessor(BaseProcessor):
             return False
 
         return True
-
-    def __is_file_changed(self, path: str) -> bool:
-        return (
-            path in self.repo.untracked_files or
-            self.repo.git.diff(None, 'HEAD', path)
-        )
 
 
 class WordpressProcessor(BaseProcessor):
