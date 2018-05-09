@@ -17,8 +17,7 @@ rule Statements_Per_Line {
         $s1 = ";"
 
     condition:
-        #s1 \ file_num_lines > 4
-        and file_num_lines > 5
+        #s1 \ file_num_lines > 1.5
 }
 rule Whitespace_Hiding_Injection {
     /*
@@ -29,7 +28,7 @@ rule Whitespace_Hiding_Injection {
         score = 4
 
     strings:
-        $re1 = /^\<\?php[\t ]{15,}[^\s\n]/
+        $re1 = /^\<\?php[\t ]{5,}[^\s\n]/
 
     condition:
         $re1
