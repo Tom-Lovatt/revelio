@@ -20,7 +20,7 @@ rule Evaluate {
 }
 rule Evaluate_Dynamic_Input {
     meta:
-        score = 4
+        score = 5
 
     strings:
         $re1 = /(eval|assert)\([^);]*(file_get_contents|\$_REQUEST|\$_GET|\$_POST|\$_COOKIE|getenv)/
