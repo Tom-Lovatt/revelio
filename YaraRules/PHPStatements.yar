@@ -269,8 +269,8 @@ rule Extract_User_Input {
             score = 5
 
         strings:
-            $re1 = /extract\(\$HTTP_(GET|SERVER|POST)_VARS/
-            $re2 = /extract\(\$_(GET|POST|REQUEST|COOKIE)/
+            $re1 = /extract *\(\$HTTP_(GET|SERVER|POST)_VARS/
+            $re2 = /extract *\(\$_(GET|POST|REQUEST|COOKIE)/
 
         condition:
             any of them
