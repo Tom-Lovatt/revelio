@@ -348,11 +348,12 @@ rule Content_Injection {
 
     strings:
         $s1 = "fputs("
+	$s2 = "fwrite("
 
         $re1 = /fopen\([^)]*\.php[^,]*,\s*['"]w\+?['"]\s*\)/
 
     condition:
-        all of them
+        $re1 and 1 of ($s*)
 }
 rule Search_Spam {
     /*
