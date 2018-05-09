@@ -126,6 +126,7 @@ rule OS_Commands {
         $re1 = /(^|[^A-Za-z_])system\(/
         $re2 = /(^|[^A-Za-z_])passthru\(/
         $re3 = /popen\(.*?,\s['"]r['"]\s*?\)/
+	$re4 = /\bexec\(/
 
     condition:
         any of them
