@@ -131,7 +131,7 @@ class GitProcessor(BaseProcessor):
         else:
             self.repo = git.Repo(project_root)
             self.git_root = project_root
-            self.changed_files = self.repo.untracked_files + [ item.a_path for item in self.repo.index.diff(None) ]
+            self.changed_files = self.repo.untracked_files + [item.a_path for item in self.repo.index.diff(None)]
 
     def ready(self) -> bool:
         return len(self.git_root) > 0

@@ -220,8 +220,8 @@ def print_progress(scanned: int, total: int, suspicious: int, start_time: float)
         completion_time = "<1 minute"
 
     log.info("{} PHP files scanned, {} suspicious files found, {}% complete. ".format(
-        scanned, suspicious, completion)
-             + "Estimate {} until completion.".format(completion_time)
+        scanned, suspicious, completion) +
+             "Estimate {} until completion.".format(completion_time)
              )
 
 
